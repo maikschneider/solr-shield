@@ -2,8 +2,8 @@
 project: solr-shield
 task: Extract solr-shield from sme-website-typo3 into a standalone, public-release TYPO3 extension
 effort: E3
-phase: execute
-progress: 0/18
+phase: complete
+progress: 16/18 (2 deferred to CI)
 mode: algorithm
 started: 2026-06-11
 updated: 2026-06-11
@@ -41,24 +41,24 @@ Produce `~/Sites/solr-shield` as an initialised git repository containing the ex
 
 ## Criteria
 
-- [ ] ISC-1: `~/Sites/solr-shield/.git` exists and `git log` shows ≥1 commit on `main`.
-- [ ] ISC-2: All PHP `Classes/`, `Configuration/`, `Resources/` files copied unchanged from source (byte-identical to origin except where intentionally tuned).
-- [ ] ISC-3: `composer.json` has no Codeception/`phar-composer`/`create-libs`/base-distribution dev cruft.
-- [ ] ISC-4: `composer.json` runtime `require` constrains `apache-solr-for-typo3/solr` to a real version range (not `*`).
-- [ ] ISC-5: `composer.json` declares runtime dep on `typo3/cms-frontend` (used by `AfterLinkIsGeneratedEvent`).
-- [ ] ISC-6: `composer.json` `require-dev` contains php-cs-fixer, phpstan, saschaegerer/phpstan-typo3, ssch/typo3-rector, editorconfig-cli, composer-normalize, typoscript-lint, translation-validator.
-- [ ] ISC-7: `composer.json` `scripts` expose `ci:sca` aggregating all linters and a `fix` group.
-- [ ] ISC-8: `composer validate --strict` passes.
-- [ ] ISC-9: README documents the ACTUAL code: `HtmlOutputObfuscationMiddleware` field-rename + signed `_ss` token; no `_sst`, no `UserFunc/TokenRenderer`, no expiry claim.
-- [ ] ISC-10: README marks the JavaScript bot-detection layer as work-in-progress / not yet functional.
-- [ ] ISC-11: `LICENSE.md` (GPL-2.0) present.
-- [ ] ISC-12: `CHANGELOG.md`, `SECURITY.md`, `CONTRIBUTING.md` present and project-specific.
-- [ ] ISC-13: `.editorconfig`, `.gitattributes`, `.gitignore` present and adapted to this extension's paths.
-- [ ] ISC-14: `php-cs-fixer.php`, `phpstan.neon`, `rector.php` present and valid.
-- [ ] ISC-15: `.github/workflows/sca.yml` present and references the composer ci scripts.
-- [ ] ISC-16: `ext_emconf.php` constraints accept TYPO3 13.4–14 and PHP ≥8.2; metadata accurate.
-- [ ] ISC-17: JavaScript file carries an explicit WIP banner comment.
-- [ ] ISC-18: Anti: no agency/site-specific identifiers or secrets ship in any committed file.
+- [x] ISC-1: `~/Sites/solr-shield/.git` exists and `git log` shows ≥1 commit on `main`.
+- [x] ISC-2: All PHP `Classes/`, `Configuration/`, `Resources/` files copied unchanged from source (byte-identical to origin except where intentionally tuned).
+- [x] ISC-3: `composer.json` has no Codeception/`phar-composer`/`create-libs`/base-distribution dev cruft.
+- [x] ISC-4: `composer.json` runtime `require` constrains `apache-solr-for-typo3/solr` to a real version range (not `*`).
+- [x] ISC-5: `composer.json` declares runtime dep on `typo3/cms-frontend` (used by `AfterLinkIsGeneratedEvent`).
+- [x] ISC-6: `composer.json` `require-dev` contains php-cs-fixer, phpstan, saschaegerer/phpstan-typo3, ssch/typo3-rector, editorconfig-cli, composer-normalize, typoscript-lint, translation-validator.
+- [x] ISC-7: `composer.json` `scripts` expose `ci:sca` aggregating all linters and a `fix` group.
+- [DEFERRED-VERIFY] ISC-8: `composer validate --strict` passes. No PHP/composer runtime in this environment; JSON validated with `jq`. Live check runs in `.github/workflows/sca.yml` (`composer validate --strict`). Follow-up: first CI run on push.
+- [x] ISC-9: README documents the ACTUAL code: `HtmlOutputObfuscationMiddleware` field-rename + signed `_ss` token; no `_sst`, no `UserFunc/TokenRenderer`, no expiry claim.
+- [x] ISC-10: README marks the JavaScript bot-detection layer as work-in-progress / not yet functional.
+- [x] ISC-11: `LICENSE.md` (GPL-2.0) present.
+- [x] ISC-12: `CHANGELOG.md`, `SECURITY.md`, `CONTRIBUTING.md` present and project-specific.
+- [x] ISC-13: `.editorconfig`, `.gitattributes`, `.gitignore` present and adapted to this extension's paths.
+- [DEFERRED-VERIFY] ISC-14: `php-cs-fixer.php`, `phpstan.neon`, `rector.php` present and valid. Files present; no PHP runtime to `php -l` locally. `php-cs-fixer.php` is a verbatim copy of tca-api's working config; `rector.php` uses the standard `RectorConfig::configure()` API. Live lint runs in CI (`ci:php:lint`). Follow-up: first CI run on push.
+- [x] ISC-15: `.github/workflows/sca.yml` present and references the composer ci scripts.
+- [x] ISC-16: `ext_emconf.php` constraints accept TYPO3 13.4–14 and PHP ≥8.2; metadata accurate.
+- [x] ISC-17: JavaScript file carries an explicit WIP banner comment.
+- [x] ISC-18: Anti: no agency/site-specific identifiers or secrets ship in any committed file.
 
 ## Test Strategy
 
@@ -96,4 +96,16 @@ Produce `~/Sites/solr-shield` as an initialised git repository containing the ex
 
 ## Verification
 
-_(populated during VERIFY)_
+- ISC-1: cmd — `git log --oneline -1` → `374e616 Initial public extraction of solr-shield`; `git rev-list --count HEAD` → 1.
+- ISC-2: diff — `diff -r` of Classes/Configuration vs source → "IDENTICAL"; locallang identical; JS diff shows only the added WIP banner (6 lines).
+- ISC-3: grep — `codeception|phar-composer|create-libs|bootstrap-package|base-distribution` in composer.json → "CLEAN: no cruft".
+- ISC-4/5: read — `apache-solr-for-typo3/solr: "^12.0 || ^13.0"`; `typo3/cms-frontend: "^13.4 || ^14.0"` present.
+- ISC-6/7: jq — require-dev keys include all 8 tools; scripts keys include `ci:sca` + `fix` group.
+- ISC-8: DEFERRED — `jq empty composer.json` → VALID JSON; `composer validate --strict` deferred to CI.
+- ISC-9/10: read — README "How It Works" matches `HtmlOutputObfuscationMiddleware`/`_ss`; JS section + top banner mark WIP.
+- ISC-13/15: ls — `.editorconfig`, `.gitattributes`, `.gitignore`, `.github/workflows/sca.yml` all staged (git status).
+- ISC-16: read — ext_emconf state `beta` 0.1.0, depends typo3 13.4.0-14.99.99, php 8.2.0-8.99.99, solr 12-13.
+- ISC-17: edit — JS banner "WORK IN PROGRESS — NOT YET OPERATIONAL" applied.
+- ISC-18: grep — sme/xima/dkfz/secret/path scan across all committed files → "CLEAN: no identifiers/secrets".
+
+**Coverage: 16/18 tool-verified, 2 DEFERRED-VERIFY (ISC-8, ISC-14 → first CI run via sca.yml).**
