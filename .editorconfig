@@ -1,0 +1,54 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# TS/JS files
+[*.{ts,js}]
+indent_size = 2
+
+# JSON files
+[*.json]
+indent_style = tab
+
+# Markdown
+[*.md]
+indent_size = 2
+
+# YAML files
+[*.{yaml,yml}]
+indent_size = 2
+
+# NEON files
+[*.neon]
+indent_size = 2
+indent_style = tab
+
+# TypoScript
+[*.{typoscript,tsconfig}]
+indent_size = 2
+
+# XLF files
+[*.xlf]
+indent_style = tab
+
+# PHP files (handled by php-cs-fixer)
+[*.php]
+indent_style = unset
+
+[/var/**]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+indent_style = unset
+indent_size = unset
+
+# end of file

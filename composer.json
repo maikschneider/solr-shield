@@ -1,0 +1,89 @@
+{
+	"name": "maikschneider/solr-shield",
+	"description": "TYPO3 extension that protects the Apache Solr search endpoint from bots and crawlers via URI obfuscation and bot detection.",
+	"license": [
+		"GPL-2.0-or-later"
+	],
+	"type": "typo3-cms-extension",
+	"keywords": [
+		"TYPO3",
+		"extension",
+		"solr",
+		"security",
+		"bot-protection"
+	],
+	"authors": [
+		{
+			"name": "Maik Schneider",
+			"email": "schneider.maik@me.com",
+			"role": "Developer"
+		}
+	],
+	"require": {
+		"php": "^8.2",
+		"apache-solr-for-typo3/solr": "^12.0 || ^13.0",
+		"typo3/cms-core": "^13.4 || ^14.0",
+		"typo3/cms-frontend": "^13.4 || ^14.0"
+	},
+	"require-dev": {
+		"armin/editorconfig-cli": "^2.0",
+		"ergebnis/composer-normalize": "^2.45",
+		"friendsofphp/php-cs-fixer": "^3.64",
+		"helmich/typo3-typoscript-lint": "^3.3",
+		"move-elevator/composer-translation-validator": "^1.3",
+		"phpstan/phpstan": "^2.1",
+		"saschaegerer/phpstan-typo3": "^2.1 || ^3.0",
+		"ssch/typo3-rector": "^2.13 || ^3.0",
+		"typo3/cms-backend": "^13.4 || ^14.0"
+	},
+	"autoload": {
+		"psr-4": {
+			"MaikSchneider\\SolrShield\\": "Classes/"
+		}
+	},
+	"config": {
+		"allow-plugins": {
+			"ergebnis/composer-normalize": true,
+			"move-elevator/composer-translation-validator": true,
+			"typo3/class-alias-loader": true,
+			"typo3/cms-composer-installers": true
+		},
+		"sort-packages": true
+	},
+	"extra": {
+		"typo3/cms": {
+			"extension-key": "solr_shield",
+			"web-dir": "public"
+		}
+	},
+	"scripts": {
+		"ci:composer:normalize": "@composer normalize --no-check-lock --dry-run",
+		"ci:editorconfig:lint": "ec --strict --git-only -n",
+		"ci:language:lint": "@composer validate-translations ./Resources/Private/Language",
+		"ci:php:fixer": "php-cs-fixer --config=php-cs-fixer.php fix --dry-run --diff",
+		"ci:php:lint": "find *.php Classes Configuration -name '*.php' -print0 | xargs -0 -n 1 -P 4 php -l",
+		"ci:php:stan": "phpstan analyse --no-progress",
+		"ci:rector": "rector --dry-run",
+		"ci:sca": [
+			"@ci:composer:normalize",
+			"@ci:editorconfig:lint",
+			"@ci:php:lint",
+			"@ci:php:fixer",
+			"@ci:language:lint",
+			"@ci:php:stan",
+			"@ci:rector",
+			"@ci:typoscript:lint"
+		],
+		"ci:typoscript:lint": "typoscript-lint --fail-on-warnings",
+		"fix": [
+			"@fix:composer:normalize",
+			"@fix:editorconfig",
+			"@fix:php:fixer",
+			"@fix:rector"
+		],
+		"fix:composer:normalize": "@composer normalize --no-check-lock",
+		"fix:editorconfig": "ec --strict --fix --git-only -n",
+		"fix:php:fixer": "php-cs-fixer --config=php-cs-fixer.php fix",
+		"fix:rector": "rector"
+	}
+}

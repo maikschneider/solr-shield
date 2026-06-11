@@ -1,0 +1,55 @@
+categories:
+    SolrShield:
+        label: 'Solr Shield'
+    SolrShield.uriObfuscation:
+        label: 'URI Obfuscation'
+        parent: SolrShield
+    SolrShield.botDetection:
+        label: 'Bot Detection'
+        parent: SolrShield
+
+settings:
+    solrShield.uriObfuscation.enabled:
+        label: 'Enable URI Obfuscation'
+        description: 'Encodes tx_solr parameters before submission so bots cannot enumerate them directly.'
+        category: SolrShield.uriObfuscation
+        type: bool
+        default: true
+
+    solrShield.uriObfuscation.rejectAction:
+        label: 'Reject Action'
+        description: 'What to do when a direct tx_solr request is detected without an obfuscation token: "redirect" (back to referer) or "403".'
+        category: SolrShield.uriObfuscation
+        type: string
+        default: redirect
+        enum:
+            redirect: 'Redirect to Referer'
+            403: 'Return 403 Forbidden'
+
+    solrShield.botDetection.enabled:
+        label: 'Enable Bot Detection'
+        description: 'Collects behavioural signals (mouse moves, key presses, elapsed time) to detect headless/scripted clients.'
+        category: SolrShield.botDetection
+        type: bool
+        default: true
+
+    solrShield.botDetection.minFormTimeout:
+        label: 'Minimum Form Timeout (seconds)'
+        description: 'Minimum elapsed seconds between page load and form submission. Submissions faster than this are rejected.'
+        category: SolrShield.botDetection
+        type: int
+        default: 3
+
+    solrShield.botDetection.securityLevel:
+        label: 'Security Level (checks out of 10)'
+        description: 'Number of behavioural checks (out of 10) that must pass for a request to be considered human.'
+        category: SolrShield.botDetection
+        type: int
+        default: 7
+
+    solrShield.botDetection.requireInteraction:
+        label: 'Require User Interaction'
+        description: 'When enabled, at least one mouse move or touch event must be recorded before the form is accepted.'
+        category: SolrShield.botDetection
+        type: bool
+        default: true

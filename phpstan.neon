@@ -1,0 +1,16 @@
+parameters:
+	parallel:
+		maximumNumberOfProcesses: 5
+
+	level: 7
+
+	paths:
+		- Classes
+		- Configuration
+
+	ignoreErrors:
+		- '#return type has no value type specified in iterable type array#'
+		- '#with no value type specified in iterable type array#'
+
+includes:
+	- vendor/saschaegerer/phpstan-typo3/extension.neon

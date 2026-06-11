@@ -1,0 +1,10 @@
+# Inject SolrShield config as inline JS (must come before the JS file)
+# Values come from site settings (settings.definitions.yaml) via {$settings.*} substitution
+page.headerData.solrShieldConfig = TEXT
+page.headerData.solrShieldConfig.value (
+  <script>window.SolrShield={botDetection:{enabled:{$settings.solrShield.botDetection.enabled},minTimeout:{$settings.solrShield.botDetection.minFormTimeout}}};</script>
+)
+
+# Inject JS in footer (deferred)
+page.includeJSFooter.solrShield = EXT:solr_shield/Resources/Public/JavaScript/solr-shield.js
+page.includeJSFooter.solrShield.defer = 1
