@@ -36,7 +36,7 @@ final readonly class AfterLinkIsGeneratedEventListener
 
         $txSolrParams = array_filter(
             $allParams,
-            static fn(string $key) => str_starts_with($key, 'tx_solr'),
+            static fn (string $key) => str_starts_with($key, 'tx_solr'),
             ARRAY_FILTER_USE_KEY
         );
 
@@ -57,7 +57,7 @@ final readonly class AfterLinkIsGeneratedEventListener
 
         $otherParams = array_filter(
             $allParams,
-            static fn(string $key) => !str_starts_with($key, 'tx_solr'),
+            static fn (string $key) => !str_starts_with($key, 'tx_solr'),
             ARRAY_FILTER_USE_KEY
         );
 

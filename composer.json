@@ -63,7 +63,6 @@
 		"ci:php:fixer": "php-cs-fixer --config=php-cs-fixer.php fix --dry-run --diff",
 		"ci:php:lint": "find *.php Classes Configuration -name '*.php' -print0 | xargs -0 -n 1 -P 4 php -l",
 		"ci:php:stan": "phpstan analyse --no-progress",
-		"ci:rector": "rector --dry-run",
 		"ci:sca": [
 			"@ci:composer:normalize",
 			"@ci:editorconfig:lint",
@@ -71,19 +70,17 @@
 			"@ci:php:fixer",
 			"@ci:language:lint",
 			"@ci:php:stan",
-			"@ci:rector",
 			"@ci:typoscript:lint"
 		],
 		"ci:typoscript:lint": "typoscript-lint --fail-on-warnings",
-		"fix": [
-			"@fix:composer:normalize",
-			"@fix:editorconfig",
-			"@fix:php:fixer",
-			"@fix:rector"
-		],
 		"fix:composer:normalize": "@composer normalize --no-check-lock",
 		"fix:editorconfig": "ec --strict --fix --git-only -n",
 		"fix:php:fixer": "php-cs-fixer --config=php-cs-fixer.php fix",
-		"fix:rector": "rector"
+		"fix:rector": "rector",
+		"sca": [
+			"@fix:composer:normalize",
+			"@fix:editorconfig",
+			"@fix:php:fixer"
+		]
 	}
 }

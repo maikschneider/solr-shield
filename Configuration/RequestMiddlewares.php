@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+use MaikSchneider\SolrShield\Middleware\HtmlOutputObfuscationMiddleware;
+use MaikSchneider\SolrShield\Middleware\SolrShieldMiddleware;
+
 return [
     'frontend' => [
         'maikschneider/solr-shield' => [
-            'target' => \MaikSchneider\SolrShield\Middleware\SolrShieldMiddleware::class,
+            'target' => SolrShieldMiddleware::class,
             'after' => [
                 'typo3/cms-frontend/site',
             ],
@@ -14,7 +17,7 @@ return [
             ],
         ],
         'maikschneider/solr-shield-html' => [
-            'target' => \MaikSchneider\SolrShield\Middleware\HtmlOutputObfuscationMiddleware::class,
+            'target' => HtmlOutputObfuscationMiddleware::class,
             'after' => [
                 'maikschneider/solr-shield',
             ],

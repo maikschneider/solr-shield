@@ -22,11 +22,11 @@ use TYPO3\CMS\Core\Site\Entity\Site;
  * validate and remap the submitted `_s[…]` parameters back to `tx_solr[…]`
  * without requiring JavaScript.
  */
-final class HtmlOutputObfuscationMiddleware implements MiddlewareInterface
+final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterface
 {
     public function __construct(
-        private readonly TokenService $tokenService,
-        private readonly StreamFactoryInterface $streamFactory,
+        private TokenService $tokenService,
+        private StreamFactoryInterface $streamFactory,
     ) {
     }
 

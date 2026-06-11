@@ -24,14 +24,14 @@ use TYPO3\CMS\Core\Site\Entity\Site;
  * Settings are read from site settings (settings.definitions.yaml), making
  * them configurable per site without any TypoScript dependency.
  */
-final class SolrShieldMiddleware implements MiddlewareInterface
+final readonly class SolrShieldMiddleware implements MiddlewareInterface
 {
     private const SUGGEST_PAGE_TYPE = 7384;
 
     public function __construct(
-        private readonly TokenService $tokenService,
-        private readonly BotDetectionService $botDetectionService,
-        private readonly ResponseFactoryInterface $responseFactory,
+        private TokenService $tokenService,
+        private BotDetectionService $botDetectionService,
+        private ResponseFactoryInterface $responseFactory,
     ) {
     }
 
