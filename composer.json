@@ -77,10 +77,18 @@
 		"fix:editorconfig": "ec --strict --fix --git-only -n",
 		"fix:php:fixer": "php-cs-fixer --config=php-cs-fixer.php fix",
 		"fix:rector": "rector",
+		"language:lint": "@composer validate-translations ./Resources/Private/Language",
+		"php:lint": "find *.php Classes Configuration -name '*.php' -print0 | xargs -0 -n 1 -P 4 php -l",
+		"php:stan": "phpstan analyse",
 		"sca": [
 			"@fix:composer:normalize",
 			"@fix:editorconfig",
-			"@fix:php:fixer"
-		]
+			"@php:lint",
+			"@fix:php:fixer",
+			"@language:lint",
+			"@php:stan",
+			"@typoscript:lint"
+		],
+		"typoscript:lint": "typoscript-lint"
 	}
 }
