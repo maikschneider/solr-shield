@@ -3,6 +3,9 @@
 	<file source-language="en" datatype="plaintext" original="EXT:solr_shield/Resources/Private/Language/locallang.xlf" date="2026-01-01T00:00:00Z" product-name="solr_shield">
 		<header/>
 		<body>
+			<trans-unit id="placeholder" xml:space="preserve">
+				<source>Placeholder</source>
+			</trans-unit>
 		</body>
 	</file>
 </xliff>
