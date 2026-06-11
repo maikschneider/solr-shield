@@ -13,4 +13,5 @@ parameters:
 		- '#with no value type specified in iterable type array#'
 
 includes:
+	- phpstan-baseline.neon
 	- vendor/saschaegerer/phpstan-typo3/extension.neon

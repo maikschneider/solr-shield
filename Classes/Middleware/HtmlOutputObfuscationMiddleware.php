@@ -88,7 +88,7 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
         $payload = $this->buildEmptySsPayload();
         $hiddenField = '<input type="hidden" name="_ss" value="' . htmlspecialchars($payload, ENT_QUOTES) . '">';
 
-        return (string)preg_replace_callback(
+        $result = preg_replace_callback(
             '/<form\b[^>]*>.*?<\/form>/si',
             static function (array $matches) use ($hiddenField): string {
                 $form = $matches[0];
@@ -98,7 +98,9 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
                 return str_replace('</form>', $hiddenField . '</form>', $form);
             },
             $html
-        ) ?? $html;
+        );
+
+        return $result ?? $html;
     }
 
     /**

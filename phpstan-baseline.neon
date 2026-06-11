@@ -1,25 +1,2 @@
 parameters:
-	ignoreErrors:
-		-
-			message: '#^Parameter \#2 \$callback of function array_filter expects \(callable\(int\|string\)\: bool\)\|null, Closure\(string\)\: bool given\.$#'
-			identifier: argument.type
-			count: 2
-			path: Classes/EventListener/AfterLinkIsGeneratedEventListener.php
-
-		-
-			message: '#^Parameter \#2 \$callback of function array_filter expects \(callable\(int\|string\)\: bool\)\|null, Closure\(string\)\: bool given\.$#'
-			identifier: argument.type
-			count: 2
-			path: Classes/EventListener/AfterUriIsProcessedEventListener.php
-
-		-
-			message: '#^Expression on left side of \?\? is not nullable\.$#'
-			identifier: nullCoalesce.expr
-			count: 1
-			path: Classes/Middleware/HtmlOutputObfuscationMiddleware.php
-
-		-
-			message: '#^Parameter \#1 \$json of function json_decode expects string, string\|false given\.$#'
-			identifier: argument.type
-			count: 1
-			path: Classes/Service/BotDetectionService.php
+	ignoreErrors: []

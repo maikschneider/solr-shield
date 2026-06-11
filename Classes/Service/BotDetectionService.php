@@ -14,7 +14,12 @@ final class BotDetectionService
 {
     public function isHuman(string $payload, array $settings = []): bool
     {
-        $data = json_decode(base64_decode($payload, true), true);
+        $decoded = base64_decode($payload, true);
+        if ($decoded === false) {
+            return false;
+        }
+
+        $data = json_decode($decoded, true);
         if (!is_array($data)) {
             return false;
         }
