@@ -28,10 +28,10 @@ settings:
 
     solrShield.botDetection.enabled:
         label: 'Enable Bot Detection'
-        description: 'Collects behavioural signals (mouse moves, key presses, elapsed time) to detect headless/scripted clients.'
+        description: 'Collects behavioural signals (mouse moves, key presses, elapsed time) to detect headless/scripted clients. Requires the client-side JavaScript layer, which is still in development (feature/js-bot-detection branch). Keep disabled on main — enabling it without the client rejects all form submissions.'
         category: SolrShield.botDetection
         type: bool
-        default: true
+        default: false
 
     solrShield.botDetection.minFormTimeout:
         label: 'Minimum Form Timeout (seconds)'

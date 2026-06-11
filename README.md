@@ -5,14 +5,9 @@
 
 TYPO3 extension that protects the [Apache Solr](https://extensions.typo3.org/extension/solr) search endpoint from bots and crawlers that enumerate search parameters (`tx_solr[filter][…]`, `tx_solr[q]`, the suggest/autocomplete endpoint) to generate thousands of unique, uncacheable requests.
 
-Two independent protection layers can be toggled per site:
+**URI Obfuscation** — `tx_solr` parameters never appear in URLs or HTML form fields; every Solr request must carry a single server-signed `_ss` token. This layer is server-side, requires no JavaScript, and needs no changes to your existing Solr templates.
 
-1. **URI Obfuscation** — `tx_solr` parameters never appear in URLs or HTML form fields; every Solr request must carry a single server-signed `_ss` token.
-2. **Bot Detection** — submissions from headless/scripted clients are rejected using behavioural signals.
-
-Neither layer requires changes to your existing Solr templates.
-
-> **Status:** The server-side URI-obfuscation layer is functional. The **client-side JavaScript bot-detection layer is a work in progress and not yet operational** — see [Client-side JavaScript](#client-side-javascript-work-in-progress) below.
+> **Bot detection (JavaScript) is not part of `main`.** A second, behavioural bot-detection layer is under development on the [`feature/js-bot-detection`](../../tree/feature/js-bot-detection) branch. The server-side validator (`BotDetectionService`) ships on `main` but is **disabled by default** because it depends on that client-side layer. Until the branch lands, leave `solrShield.botDetection.enabled` off.
 
 ---
 
@@ -57,25 +52,15 @@ Settings are configured per site under *Site Management → Sites → [your site
 
 ### Bot Detection
 
-| Setting | Type | Default | Description |
-|---|---|---|---|
-| `solrShield.botDetection.enabled` | bool | `true` | Enable/disable bot detection |
-| `solrShield.botDetection.minFormTimeout` | int | `3` | Minimum seconds between page load and form submission |
-| `solrShield.botDetection.securityLevel` | int | `7` | Number of behavioural checks (out of 10) that must pass |
-| `solrShield.botDetection.requireInteraction` | bool | `true` | Require at least one mouse-move or touch event |
+Bot-detection settings exist but default to **disabled** on `main` (the client-side layer they depend on lives on the [`feature/js-bot-detection`](../../tree/feature/js-bot-detection) branch). `solrShield.botDetection.enabled` defaults to `false`; the remaining keys (`minFormTimeout`, `securityLevel`, `requireInteraction`) only take effect once it is enabled together with the JavaScript layer.
 
-You can also override these in `config/sites/<site>/settings.yaml`:
+You can also override the obfuscation settings in `config/sites/<site>/settings.yaml`:
 
 ```yaml
 solrShield:
   uriObfuscation:
     enabled: true
     rejectAction: redirect
-  botDetection:
-    enabled: true
-    minFormTimeout: 3
-    securityLevel: 7
-    requireInteraction: true
 ```
 
 ---
@@ -129,22 +114,11 @@ On submission `SolrShieldMiddleware` remaps `_s[…]` back to `tx_solr[…]` and
 | Suggest request (pageType `7384`) without `_ss` | Reject |
 | No Solr params, or obfuscation disabled | Pass through unchanged |
 
-### Protection 2 — Bot Detection
+### Protection 2 — Bot Detection (in development)
 
-**Goal:** detect headless browsers and scripted clients from behavioural signals they cannot reliably reproduce.
+A second, optional layer scores behavioural signals (elapsed time, mouse/scroll/key/touch interaction, `navigator.webdriver`, screen/viewport dimensions) to reject headless and scripted clients. The server-side validator (`BotDetectionService`) ships on `main`, but the client-side JavaScript that collects the signals — and the TypoScript that wires it up — lives on the [`feature/js-bot-detection`](../../tree/feature/js-bot-detection) branch and is **not yet operational**.
 
-`BotDetectionService` validates a base64-JSON `_solr_bot` payload server-side. Two checks are **always** enforced:
-
-- `navigator.webdriver` must be absent/false
-- Screen resolution must not be the `800×600` headless default
-
-Eight further checks (elapsed time ≥ `minFormTimeout`, mouse/touch interaction, scroll, keyboard, viewport dimensions, sane timestamp) contribute to a score; the request passes when `score >= securityLevel` (default 7).
-
-#### Client-side JavaScript (work in progress)
-
-> ⚠️ **`Resources/Public/JavaScript/solr-shield.js` is a work in progress and is not yet operational.** It is shipped as-is so the moving parts are visible, but it does not currently produce a valid `_solr_bot` payload end-to-end. Until it is finished, run the extension with `solrShield.botDetection.enabled: false`, or rely on the server-side URI-obfuscation layer alone (which is fully functional and JavaScript-free).
-
-When complete, the script is intended to collect behavioural signals (elapsed time, mouse/scroll/key/touch counts, `navigator.webdriver`, screen/viewport dimensions), write them into the hidden `_solr_bot` field immediately before submission, and patch the `data-suggest` autocomplete URL with the server-issued `_ss` token. Configuration is injected via TypoScript into `window.SolrShield`.
+Bot detection therefore defaults to **off** on `main`. Enabling it without the client-side layer would reject every form submission. Track or contribute to the work on the feature branch.
 
 ---
 
@@ -166,9 +140,8 @@ solr-shield/
 │   ├── RequestMiddlewares.php                       # PSR-15 middleware registration
 │   ├── Services.yaml                                # DI + event-listener registration
 │   ├── Sets/SolrShield/                             # Site set: config, settings, setup
-│   └── TypoScript/setup.typoscript                  # window.SolrShield config + JS include
+│   └── TypoScript/setup.typoscript                  # (JS wiring lives on the feature branch)
 ├── Resources/
-│   ├── Public/JavaScript/solr-shield.js             # Client-side bot detection (WIP)
 │   └── Private/Language/locallang.xlf
 ├── composer.json
 ├── ext_emconf.php
