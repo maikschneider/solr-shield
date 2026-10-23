@@ -1,0 +1,19 @@
+{
+	"name": "maikschneider/solr-shield-test",
+	"description": "Functional test fixture: echoes the request parameters that reach the page and renders a search form",
+	"license": "GPL-2.0-or-later",
+	"type": "typo3-cms-extension",
+	"require": {
+		"maikschneider/solr-shield": "*"
+	},
+	"autoload": {
+		"psr-4": {
+			"MaikSchneider\\SolrShieldTest\\": "Classes/"
+		}
+	},
+	"extra": {
+		"typo3/cms": {
+			"extension-key": "solr_shield_test"
+		}
+	}
+}

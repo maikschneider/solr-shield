@@ -13,3 +13,4 @@ parameters:
 		paths:
 				- Classes
 				- Configuration
+				- Tests

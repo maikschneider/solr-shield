@@ -51,6 +51,7 @@
 	},
 	"autoload-dev": {
 		"psr-4": {
+			"MaikSchneider\\SolrShieldTest\\": "Tests/Functional/Middleware/Fixtures/Extensions/solr_shield_test/Classes",
 			"MaikSchneider\\SolrShield\\Tests\\": "Tests"
 		}
 	},

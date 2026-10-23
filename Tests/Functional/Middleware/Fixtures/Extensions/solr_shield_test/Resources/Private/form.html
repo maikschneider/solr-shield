@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+<body>
+<form id="search" action="/search" method="get">
+    <input type="text" name="tx_solr[q]" value="">
+    <input type="hidden" name='tx_solr[filter][0]' value="type:pages">
+    <button type="submit">Search</button>
+</form>
+<form id="newsletter" action="/newsletter" method="post">
+    <input type="email" name="email">
+</form>
+</body>
+</html>

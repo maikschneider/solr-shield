@@ -162,9 +162,9 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
      */
     private function extractParam(array $queryParams, mixed $parsedBody, string $name): string
     {
-        return (string)($queryParams[$name]
-            ?? ((array)($parsedBody ?? []))[$name]
-            ?? '');
+        $value = $queryParams[$name] ?? ((array)($parsedBody ?? []))[$name] ?? '';
+
+        return is_string($value) ? $value : '';
     }
 
     /**
