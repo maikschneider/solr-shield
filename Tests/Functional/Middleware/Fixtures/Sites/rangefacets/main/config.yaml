@@ -1,8 +1,6 @@
 base: 'http://localhost/'
 dependencies:
-  - maikschneider/solr-shield-test
-  - apache-solr-for-typo3/solr-example-facets-date-range
-  - apache-solr-for-typo3/solr-example-numeric-range
+  - maikschneider/solr-shield-test-range-facets
 languages:
   -
     title: English

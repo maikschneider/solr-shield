@@ -1,0 +1,4 @@
+name: maikschneider/solr-shield-test-range-facets
+label: 'Solr Shield test page with EXT:solr range facet scripts'
+dependencies:
+  - maikschneider/solr-shield-test
