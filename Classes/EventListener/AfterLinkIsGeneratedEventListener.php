@@ -78,6 +78,8 @@ final readonly class AfterLinkIsGeneratedEventListener
      * Recursively checks whether any value still contains a Solr routing
      * placeholder (e.g. ###tx_solr:page###), which marks an unresolved link
      * template that must not be obfuscated yet.
+     *
+     * @param array<array-key, mixed> $params
      */
     private function containsRoutingPlaceholder(array $params): bool
     {

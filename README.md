@@ -1,13 +1,13 @@
 # Solr Shield
 
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](LICENSE.md)
-[![TYPO3 13](https://img.shields.io/badge/TYPO3-13.4-orange.svg)](https://get.typo3.org/version/13)
+[![TYPO3 13 | 14](https://img.shields.io/badge/TYPO3-13.4%20%7C%2014.3-orange.svg)](https://get.typo3.org/)
 
 TYPO3 extension that protects the [Apache Solr](https://extensions.typo3.org/extension/solr) search endpoint from bots and crawlers that enumerate search parameters (`tx_solr[filter][…]`, `tx_solr[q]`, the suggest/autocomplete endpoint) to generate thousands of unique, uncacheable requests.
 
 **URI Obfuscation** — `tx_solr` parameters never appear in URLs or HTML form fields; every Solr request must carry a single server-signed `_ss` token. This layer is server-side, requires no JavaScript, and needs no changes to your existing Solr templates.
 
-> **Bot detection (JavaScript) is not part of `main`.** A second, behavioural bot-detection layer is under development on the [`feature/js-bot-detection`](../../tree/feature/js-bot-detection) branch. The server-side validator (`BotDetectionService`) ships on `main` but is **disabled by default** because it depends on that client-side layer. Until the branch lands, leave `solrShield.botDetection.enabled` off.
+> **Bot detection (JavaScript) is not part of `main`.** A second, behavioural bot-detection layer is under development ([#8](https://github.com/maikschneider/solr-shield/issues/8)). The server-side validator (`BotDetectionService`) ships on `main` but is **disabled by default** because it depends on that client-side layer. Until it lands, leave `solrShield.botDetection.enabled` off.
 
 ---
 
@@ -16,8 +16,8 @@ TYPO3 extension that protects the [Apache Solr](https://extensions.typo3.org/ext
 | Dependency | Version |
 |---|---|
 | PHP | `^8.2` |
-| TYPO3 CMS | `^13.4 \|\| ^14.0` |
-| apache-solr-for-typo3/solr | `^12.0 \|\| ^13.0` |
+| TYPO3 CMS | `^13.4 \|\| ^14.3` |
+| apache-solr-for-typo3/solr | `^13.0 \|\| ^14.0` |
 
 ---
 
@@ -52,7 +52,7 @@ Settings are configured per site under *Site Management → Sites → [your site
 
 ### Bot Detection
 
-Bot-detection settings exist but default to **disabled** on `main` (the client-side layer they depend on lives on the [`feature/js-bot-detection`](../../tree/feature/js-bot-detection) branch). `solrShield.botDetection.enabled` defaults to `false`; the remaining keys (`minFormTimeout`, `securityLevel`, `requireInteraction`) only take effect once it is enabled together with the JavaScript layer.
+Bot-detection settings exist but default to **disabled** on `main` (the client-side layer they depend on is not built yet, see [#8](https://github.com/maikschneider/solr-shield/issues/8)). `solrShield.botDetection.enabled` defaults to `false`; the remaining keys (`minFormTimeout`, `securityLevel`, `requireInteraction`) only take effect once it is enabled together with the JavaScript layer.
 
 You can also override the obfuscation settings in `config/sites/<site>/settings.yaml`:
 
@@ -116,9 +116,9 @@ On submission `SolrShieldMiddleware` remaps `_s[…]` back to `tx_solr[…]` and
 
 ### Protection 2 — Bot Detection (in development)
 
-A second, optional layer scores behavioural signals (elapsed time, mouse/scroll/key/touch interaction, `navigator.webdriver`, screen/viewport dimensions) to reject headless and scripted clients. The server-side validator (`BotDetectionService`) ships on `main`, but the client-side JavaScript that collects the signals — and the TypoScript that wires it up — lives on the [`feature/js-bot-detection`](../../tree/feature/js-bot-detection) branch and is **not yet operational**.
+A second, optional layer scores behavioural signals (elapsed time, mouse/scroll/key/touch interaction, `navigator.webdriver`, screen/viewport dimensions) to reject headless and scripted clients. The server-side validator (`BotDetectionService`) ships on `main`, but the client-side JavaScript that collects the signals — and the TypoScript that wires it up — is not built yet ([#8](https://github.com/maikschneider/solr-shield/issues/8)), so the layer is **not yet operational**.
 
-Bot detection therefore defaults to **off** on `main`. Enabling it without the client-side layer would reject every form submission. Track or contribute to the work on the feature branch.
+Bot detection therefore defaults to **off** on `main`. Enabling it without the client-side layer would reject every form submission. Track or contribute to the work in [#8](https://github.com/maikschneider/solr-shield/issues/8).
 
 ---
 
@@ -140,7 +140,7 @@ solr-shield/
 │   ├── RequestMiddlewares.php                       # PSR-15 middleware registration
 │   ├── Services.yaml                                # DI + event-listener registration
 │   ├── Sets/SolrShield/                             # Site set: config, settings, setup
-│   └── TypoScript/setup.typoscript                  # (JS wiring lives on the feature branch)
+│   └── TypoScript/setup.typoscript                  # (JS wiring follows with #8)
 ├── Resources/
 │   └── Private/Language/locallang.xlf
 ├── composer.json
@@ -152,11 +152,12 @@ solr-shield/
 
 ## Development
 
-This repository uses Composer-based quality tooling. After `composer install`:
-
 ```bash
-composer ci:sca   # run all static analysis (cs-fixer, phpstan, rector, lint, editorconfig, yaml/typoscript, translations)
-composer fix      # auto-fix: cs-fixer, rector, editorconfig, composer normalize
+ddev start
+ddev composer install
+ddev init-typo3
+ddev composer sca      # fix what can be fixed, then lint and analyse
+ddev composer ci:sca   # read-only, as in CI
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
