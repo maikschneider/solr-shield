@@ -16,8 +16,8 @@
                interlink-shortcode="maikschneider/solr-shield"
     />
     <project title="SOLR_SHIELD"
-             release="0.1.0"
-             version="0.1.0"
+             release="1.0.1"
+             version="1.0.1"
              copyright="since 2026 by Maik Schneider &amp; Contributors"
     />
     <inventory id="t3coreapi"
