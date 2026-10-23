@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Quality tooling: php-cs-fixer, PHPStan (+ phpstan-typo3), Rector, editorconfig-cli, composer-normalize, TypoScript lint, translation validation, and a GitHub Actions SCA workflow.
 - Server-side bot-detection validator (`BotDetectionService`), shipped **disabled by default**.
 
+### Changed
+
+- **Tooling matches the other `maikschneider/*` extensions.** DDEV setup with `ddev init-typo3`, PHPStan level 8 without baseline, Rector and YAML lint in `composer sca` / `ci:sca`, SCA workflow inside DDEV with pull request annotations, TER release workflow and `packaging_exclude.php` ([#2](https://github.com/maikschneider/solr-shield/issues/2)).
+- **Requires TYPO3 `^13.4 || ^14.3` and EXT:solr `^13.0 || ^14.0`.** EXT:solr 14 needs TYPO3 14.3; `dev-main` is no longer accepted ([#2](https://github.com/maikschneider/solr-shield/issues/2)).
+
 ### Notes
 
-- The client-side JavaScript bot-detection layer is **not part of `main`**. It is under development on the `feature/js-bot-detection` branch (JavaScript + TypoScript wiring + detailed docs). `main` ships only the server-side validator, disabled by default, until that work is complete.
+- The client-side JavaScript bot-detection layer is **not part of `main`** yet ([#8](https://github.com/maikschneider/solr-shield/issues/8)). `main` ships only the server-side validator, disabled by default, until that work is complete.

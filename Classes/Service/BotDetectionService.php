@@ -12,6 +12,9 @@ namespace MaikSchneider\SolrShield\Service;
  */
 final class BotDetectionService
 {
+    /**
+     * @param array<string, mixed> $settings
+     */
     public function isHuman(string $payload, array $settings = []): bool
     {
         $decoded = base64_decode($payload, true);

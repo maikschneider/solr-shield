@@ -4,38 +4,50 @@ on:
   push:
     branches:
       - main
+      - 'renovate/**'
   pull_request:
     branches:
       - main
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   sca:
-    name: SCA (PHP ${{ matrix.php-version }}, TYPO3 ${{ matrix.typo3-version }})
+    name: SCA
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        php-version: ["8.2", "8.3", "8.4"]
-        typo3-version: ["13.4", "14.0"]
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
         with:
-          php-version: ${{ matrix.php-version }}
-          tools: composer:v2
-          coverage: none
+          fetch-depth: 0
 
+      # Setup DDEV
+      - name: Setup DDEV
+        uses: ddev/github-action-setup-ddev@v1
+        with:
+          autostart: false
+
+      # Install dependencies
       - name: Install Composer dependencies
-        run: composer update --with=typo3/cms-core:"^${{ matrix.typo3-version }}" --no-progress --prefer-dist
-
-      - name: Validate composer.json
-        run: composer validate --strict
+        run: |
+          ddev start
+          ddev composer config github-oauth.github.com ${{ secrets.GITHUB_TOKEN }}
+          ddev composer install
 
       - name: Run static code analysis
-        run: composer ci:sca
+        run: ddev composer ci:sca
+
+      - uses: staabm/annotate-pull-request-from-checkstyle-action@v1
+        name: Annotate PHP CS Fixer
+        if: always()
+        with:
+          files: php-cs-fixer.xml
+          notices-as-warnings: true
+
+      - uses: staabm/annotate-pull-request-from-checkstyle-action@v1
+        name: Annotate PHPStan
+        if: always()
+        with:
+          files: phpstan.xml
+          notices-as-warnings: true
