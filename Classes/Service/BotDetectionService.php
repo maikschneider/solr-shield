@@ -9,9 +9,16 @@ namespace MaikSchneider\SolrShield\Service;
  *
  * Returns true when the request appears to originate from a human user,
  * false when heuristics indicate an automated/headless client.
+ *
+ * Ten checks: the two hard checks (no `navigator.webdriver`, no headless
+ * default screen size) must pass, and at least `securityLevel` of all ten
+ * must pass. Every value comes from the client, so anything that is not a
+ * number counts as zero instead of failing the request with an error.
  */
 final class BotDetectionService
 {
+    private const CHECK_COUNT = 10;
+
     /**
      * @param array<string, mixed> $settings
      */
@@ -27,30 +34,39 @@ final class BotDetectionService
             return false;
         }
 
-        $minTimeout = (int)($settings['minFormTimeout'] ?? 3);
-        $securityLevel = (int)($settings['securityLevel'] ?? 7);
+        if (!empty($data['webdriver']) || $this->isHeadlessResolution($this->int($data, 'screenWidth'), $this->int($data, 'screenHeight'))) {
+            return false;
+        }
+
+        $minTimeout = $this->int($settings, 'minFormTimeout', 3);
+        $securityLevel = max(0, min(self::CHECK_COUNT, $this->int($settings, 'securityLevel', 7)));
         $requireInteraction = (bool)($settings['requireInteraction'] ?? true);
+        $elapsed = $this->int($data, 'elapsed', -1);
 
-        $checks = [];
+        $softChecks = [
+            $elapsed >= $minTimeout,
+            $this->int($data, 'mouseMoveCount') > 0 || $this->int($data, 'touchCount') > 0 || !$requireInteraction,
+            $this->int($data, 'scrollCount') > 0,
+            $this->int($data, 'keyCount') > 0,
+            $this->int($data, 'viewportWidth') > 0,
+            $this->int($data, 'viewportHeight') > 0,
+            $elapsed >= 0 && $elapsed < 3600,
+            abs(time() - intdiv($this->int($data, 'ts'), 1000)) < 600,
+        ];
 
-        // Hard checks: always enforced
-        $checks[] = empty($data['webdriver']);
-        $checks[] = !$this->isHeadlessResolution($data['screenWidth'] ?? 0, $data['screenHeight'] ?? 0);
+        return 2 + count(array_filter($softChecks)) >= $securityLevel;
+    }
 
-        // Soft checks: counted against securityLevel
-        $checks[] = (int)($data['elapsed'] ?? 0) >= $minTimeout;
-        $checks[] = (int)($data['mouseMoveCount'] ?? 0) > 0 || (int)($data['touchCount'] ?? 0) > 0 || !$requireInteraction;
-        $checks[] = (int)($data['scrollCount'] ?? 0) > 0;
-        $checks[] = (int)($data['keyCount'] ?? 0) > 0;
-        $checks[] = isset($data['viewportWidth']) && (int)$data['viewportWidth'] > 0;
-        $checks[] = isset($data['viewportHeight']) && (int)$data['viewportHeight'] > 0;
-        $checks[] = isset($data['elapsed']) && (int)$data['elapsed'] < 3600;
-        $checks[] = isset($data['ts']) && abs(time() - (int)($data['ts'] / 1000)) < 600;
+    /**
+     * @param array<array-key, mixed> $data
+     */
+    private function int(array $data, string $key, int $default = 0): int
+    {
+        $value = $data[$key] ?? null;
 
-        $passed = count(array_filter($checks));
-        $total = count($checks);
-
-        return $passed >= min($securityLevel, $total);
+        return is_int($value) || is_float($value) || (is_string($value) && is_numeric($value))
+            ? (int)$value
+            : $default;
     }
 
     private function isHeadlessResolution(int $width, int $height): bool
