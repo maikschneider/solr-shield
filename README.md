@@ -23,7 +23,7 @@ After:  /search?_ss=eyJwIjoidHhfc29sciU1QnElNUQ9…
 
 * Facet, pagination, sorting and other `typolink()` links carry one signed `_ss` parameter instead of `tx_solr[…]`
 * Search form fields are renamed in the rendered HTML and get a signed hidden field, so search works without JavaScript
-* Unsigned `tx_solr` requests and suggest requests are redirected back or answered with `403`
+* Unsigned `tx_solr` requests and suggest requests are answered with `403`, or redirected back on the same site
 * No template changes, configured per site
 * Optional bot detection: a small script scores mouse, touch, scroll and key activity, and requests that fail its checks are rejected, which raises the cost of scripted crawling
 
@@ -51,7 +51,7 @@ Add the site set **Solr Shield** (`maikschneider/solr-shield`) to your site, the
 solrShield:
   uriObfuscation:
     enabled: true
-    rejectAction: redirect  # or 403
+    rejectAction: '403'  # or redirect
 ```
 
 ## 📙 Documentation

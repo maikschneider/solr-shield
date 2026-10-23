@@ -50,19 +50,19 @@ final class BotDetectionTest extends AbstractMiddlewareTestCase
     #[Test]
     public function signedRequestWithoutPayloadIsRejected(): void
     {
-        $this->assertRedirectsTo('/', $this->request($this->signedUri('tx_solr%5Bq%5D=foo', null)));
+        $this->assertForbidden($this->request($this->signedUri('tx_solr%5Bq%5D=foo', null)));
     }
 
     #[Test]
     public function signedRequestWithBotPayloadIsRejected(): void
     {
-        $this->assertRedirectsTo('/', $this->request($this->signedUri('tx_solr%5Bq%5D=foo', self::botPayload(['webdriver' => true]))));
+        $this->assertForbidden($this->request($this->signedUri('tx_solr%5Bq%5D=foo', self::botPayload(['webdriver' => true]))));
     }
 
     #[Test]
     public function signedRequestWithMalformedPayloadIsRejected(): void
     {
-        $this->assertRedirectsTo('/', $this->request($this->signedUri('tx_solr%5Bq%5D=foo', base64_encode('{"screenWidth":"wide","ts":[]}'))));
+        $this->assertForbidden($this->request($this->signedUri('tx_solr%5Bq%5D=foo', base64_encode('{"screenWidth":"wide","ts":[]}'))));
     }
 
     #[Test]

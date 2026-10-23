@@ -30,9 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Tooling matches the other `maikschneider/*` extensions.** DDEV setup with `ddev init-typo3`, PHPStan level 8 without baseline, Rector and YAML lint in `composer sca` / `ci:sca`, SCA workflow inside DDEV with pull request annotations, TER release workflow and `packaging_exclude.php` ([#2](https://github.com/maikschneider/solr-shield/issues/2)).
 - **Requires TYPO3 `^13.4 || ^14.3` and EXT:solr `^13.0 || ^14.0`.** EXT:solr 14 needs TYPO3 14.3; `dev-main` is no longer accepted ([#2](https://github.com/maikschneider/solr-shield/issues/2)).
+- **Rejected requests get a `403` by default.** `solrShield.uriObfuscation.rejectAction` now defaults to `403`; set it to `redirect` to send visitors back instead ([#7](https://github.com/maikschneider/solr-shield/issues/7)).
 
 ### Fixed
 
+- **No open redirect on rejection.** With `rejectAction: redirect`, the `Referer` is only followed when it has the scheme, host and port of the request; any other referer redirects to the site root ([#7](https://github.com/maikschneider/solr-shield/issues/7)).
 - **Bot detection rejects what it claims to.** A `navigator.webdriver` flag or the headless 800×600 screen now rejects on its own instead of counting as one failed check out of ten; non-numeric client values count as zero instead of ending in a `TypeError` (HTTP 500); `securityLevel` is clamped to 0–10 ([#8](https://github.com/maikschneider/solr-shield/issues/8)).
 - **Autocomplete works with URI obfuscation enabled.** EXT:solr's `data-suggest` URLs get a signed `_ss`, so suggest requests are no longer rejected, and signed `additionalFilters` now reach EXT:solr next to the typed `tx_solr[queryString]` ([#13](https://github.com/maikschneider/solr-shield/issues/13)).
 - **Date and numeric range facets work with URI obfuscation and bot detection.** EXT:solr's range facet scripts look for `___FROM___` and `___TO___` in a URL template that now sits inside `_ss`, and navigate past `solr-shield.js`. The HTML middleware swaps them for patched copies for EXT:solr 13 and 14 that fill the range into the payload and navigate through a signed link click ([#8](https://github.com/maikschneider/solr-shield/issues/8)).

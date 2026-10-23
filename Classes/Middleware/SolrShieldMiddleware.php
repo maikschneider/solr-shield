@@ -12,6 +12,7 @@ use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use TYPO3\CMS\Core\Http\RedirectResponse;
+use TYPO3\CMS\Core\Http\Uri;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
 /**
@@ -105,7 +106,7 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
         return [
             'uriObfuscation' => [
                 'enabled' => (bool)($siteSettings?->get('solrShield.uriObfuscation.enabled', true) ?? true),
-                'rejectAction' => (string)($siteSettings?->get('solrShield.uriObfuscation.rejectAction', 'redirect') ?? 'redirect'),
+                'rejectAction' => (string)($siteSettings?->get('solrShield.uriObfuscation.rejectAction', '403') ?? '403'),
             ],
             'botDetection' => [
                 // Off by default: visitors without JavaScript cannot send a payload.
@@ -206,8 +207,37 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
             return $this->responseFactory->createResponse(403);
         }
 
-        $referer = $request->getHeaderLine('Referer');
-        return new RedirectResponse($referer !== '' ? $referer : '/', 302);
+        return new RedirectResponse($this->redirectTarget($request), 302);
+    }
+
+    /**
+     * The referer, if it is on the same scheme, host and port as the request,
+     * otherwise the site root. The target is rebuilt from the request URI so
+     * that only the referer's path and query are taken over.
+     */
+    private function redirectTarget(ServerRequestInterface $request): string
+    {
+        $site = $request->getAttribute('site');
+        $fallback = $site instanceof Site ? (string)$site->getBase() : '/';
+
+        try {
+            $referer = new Uri($request->getHeaderLine('Referer'));
+        } catch (\InvalidArgumentException) {
+            return $fallback;
+        }
+        $uri = $request->getUri();
+        if ($referer->getScheme() !== $uri->getScheme()
+            || $referer->getHost() !== $uri->getHost()
+            || $referer->getPort() !== $uri->getPort()
+        ) {
+            return $fallback;
+        }
+
+        return (string)$uri
+            ->withUserInfo('')
+            ->withPath($referer->getPath() !== '' ? $referer->getPath() : '/')
+            ->withQuery($referer->getQuery())
+            ->withFragment('');
     }
 
     /**
