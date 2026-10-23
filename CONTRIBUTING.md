@@ -12,6 +12,15 @@ ddev composer install
 ddev init-typo3
 ```
 
+## Running Tests
+
+Tests use the TYPO3 Testing Framework and PHPUnit.
+
+```bash
+ddev exec vendor/bin/phpunit --testsuite Unit
+ddev exec vendor/bin/phpunit --testsuite Functional
+```
+
 ## Code Quality Standards
 
 Please run all checks before submitting a pull request.

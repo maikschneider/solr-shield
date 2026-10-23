@@ -1,0 +1,11 @@
+base: 'http://localhost/'
+dependencies:
+  - maikschneider/solr-shield
+languages:
+  -
+    title: English
+    enabled: true
+    locale: en_US
+    base: /
+    languageId: 0
+rootPageId: 1
