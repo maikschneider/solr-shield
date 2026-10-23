@@ -1,0 +1,4 @@
+name: maikschneider/solr-shield-test
+label: 'Solr Shield test page'
+dependencies:
+  - maikschneider/solr-shield

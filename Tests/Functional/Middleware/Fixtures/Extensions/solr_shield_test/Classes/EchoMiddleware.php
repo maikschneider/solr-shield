@@ -12,13 +12,17 @@ use TYPO3\CMS\Core\Http\HtmlResponse;
 use TYPO3\CMS\Core\Http\JsonResponse;
 
 /**
- * Stands in for the page: `/form` renders search markup, every other path
- * echoes the parameters that made it past the Solr Shield middleware.
+ * Stands in for the page: `/form` renders search markup, `/page` is rendered
+ * by TYPO3, every other path echoes the parameters that made it past the
+ * Solr Shield middleware.
  */
 final class EchoMiddleware implements MiddlewareInterface
 {
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
+        if ($request->getUri()->getPath() === '/page') {
+            return $handler->handle($request);
+        }
         if ($request->getUri()->getPath() === '/form') {
             return new HtmlResponse((string)file_get_contents(__DIR__ . '/../Resources/Private/form.html'));
         }

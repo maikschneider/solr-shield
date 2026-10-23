@@ -70,7 +70,12 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
 
         // --- Protection 2: Bot Detection ---
         if ($settings['botDetection']['enabled'] && !$isSuggestRequest && $hasSs) {
-            $botPayload = $this->extractParam($queryParams, $parsedBody, '_solr_bot');
+            // A form posted to a URL that came from a signed link carries that
+            // link's older payload in the query; the one in the body is fresh.
+            $botPayload = $this->extractParam([], $parsedBody, '_solr_bot');
+            if ($botPayload === '') {
+                $botPayload = $this->extractParam($queryParams, null, '_solr_bot');
+            }
             if ($botPayload === '') {
                 return $this->reject($request, $settings['uriObfuscation']['rejectAction']);
             }
@@ -103,8 +108,7 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
                 'rejectAction' => (string)($siteSettings?->get('solrShield.uriObfuscation.rejectAction', 'redirect') ?? 'redirect'),
             ],
             'botDetection' => [
-                // Defaults off on main: the client-side JS that produces the
-                // _solr_bot payload lives on the feature/js-bot-detection branch.
+                // Off by default: visitors without JavaScript cannot send a payload.
                 'enabled' => (bool)($siteSettings?->get('solrShield.botDetection.enabled', false) ?? false),
                 'minFormTimeout' => (int)($siteSettings?->get('solrShield.botDetection.minFormTimeout', 3) ?? 3),
                 'securityLevel' => (int)($siteSettings?->get('solrShield.botDetection.securityLevel', 7) ?? 7),

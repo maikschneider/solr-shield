@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace MaikSchneider\SolrShield\Middleware;
 
+use MaikSchneider\SolrShield\Service\PublicResourceResolver;
 use MaikSchneider\SolrShield\Service\TokenService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use TYPO3\CMS\Core\Information\Typo3Version;
 use TYPO3\CMS\Core\Site\Entity\Site;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
  * Rewrites tx_solr form field names in the final HTML response so that
@@ -21,12 +24,18 @@ use TYPO3\CMS\Core\Site\Entity\Site;
  * field carrying a server-signed token so that SolrShieldMiddleware can
  * validate and remap the submitted `_s[…]` parameters back to `tx_solr[…]`
  * without requiring JavaScript.
+ *
+ * EXT:solr's range facet scripts are swapped for patched copies that can
+ * fill a range into the signed `_ss` payload.
  */
 final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterface
 {
+    private const RANGE_FACET_SCRIPTS = ['facet_daterange_controller', 'facet_numericrange_controller'];
+
     public function __construct(
         private TokenService $tokenService,
         private StreamFactoryInterface $streamFactory,
+        private PublicResourceResolver $resourceResolver,
     ) {
     }
 
@@ -43,7 +52,7 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
         }
 
         $body = (string)$response->getBody();
-        $modified = $this->signSuggestUrls($this->rewriteFieldNames($body));
+        $modified = $this->replaceRangeFacetScripts($this->signSuggestUrls($this->rewriteFieldNames($body)));
 
         if ($modified === $body) {
             return $response;
@@ -103,6 +112,51 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
         );
 
         return $result ?? $html;
+    }
+
+    /**
+     * Point script tags that load EXT:solr's range facet controllers to the
+     * patched copies. Their URL templates sit inside the signed `_ss` payload,
+     * and they navigate through a link click so solr-shield.js can sign it.
+     */
+    private function replaceRangeFacetScripts(string $html): string
+    {
+        $version = (new Typo3Version())->getMajorVersion() >= 14 ? 'v14' : 'v13';
+
+        foreach (self::RANGE_FACET_SCRIPTS as $script) {
+            if (!str_contains($html, $script)) {
+                continue;
+            }
+            $stock = $this->resourceResolver->resolve('EXT:solr/Resources/Public/JavaScript/' . $script . '.js');
+            $patchedResource = 'EXT:solr_shield/Resources/Public/JavaScript/Solr/' . $version . '/' . $script . '.js';
+            $patched = htmlspecialchars($this->resourceResolver->resolve($patchedResource, true), ENT_QUOTES);
+            // FE.versionNumberInFilename turns `x.js` into `x.1761211273.js`.
+            $stockPattern = preg_quote(substr($stock, 0, -3), '/') . '(?:\.\d+)?\.js(?:\?[^"\']*)?';
+
+            $html = preg_replace_callback(
+                '/<script\b[^>]*\ssrc=(["\'])[^"\']*' . $stockPattern . '\1[^>]*>/i',
+                fn (array $matches): string => $this->pointScriptTagTo($matches[0], $patched, $patchedResource),
+                $html
+            ) ?? $html;
+        }
+
+        return $html;
+    }
+
+    /**
+     * Replace the `src` of a script tag and, if it has one, its `integrity`
+     * hash, which would otherwise make the browser refuse the patched file.
+     */
+    private function pointScriptTagTo(string $tag, string $src, string $resource): string
+    {
+        $tag = (string)preg_replace('/(\ssrc=)(["\'])[^"\']*\2/i', '$1$2' . $src . '$2', $tag);
+        if (!preg_match('/\sintegrity=(["\'])[^"\']*\1/i', $tag)) {
+            return $tag;
+        }
+        $contents = (string)file_get_contents(GeneralUtility::getFileAbsFileName($resource));
+        $integrity = 'sha384-' . base64_encode(hash('sha384', $contents, true));
+
+        return (string)preg_replace('/(\sintegrity=)(["\'])[^"\']*\2/i', '$1$2' . $integrity . '$2', $tag);
     }
 
     /**

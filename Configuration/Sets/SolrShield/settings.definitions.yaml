@@ -28,7 +28,7 @@ settings:
 
     solrShield.botDetection.enabled:
         label: 'Enable Bot Detection'
-        description: 'Collects behavioural signals (mouse moves, key presses, elapsed time) to detect headless/scripted clients. Requires the client-side JavaScript layer, which is still in development (feature/js-bot-detection branch). Keep disabled on main — enabling it without the client rejects all form submissions.'
+        description: 'Includes a script that collects behavioural signals (mouse moves, key presses, elapsed time) and rejects Solr requests from headless or scripted clients. Visitors without JavaScript can no longer search or follow filter links.'
         category: SolrShield.botDetection
         type: bool
         default: false

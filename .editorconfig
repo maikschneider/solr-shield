@@ -82,3 +82,8 @@ indent_style = unset
 indent_size = unset
 
 # end of file
+
+# Copies of EXT:solr's scripts keep upstream formatting
+[Resources/Public/JavaScript/Solr/**]
+indent_style = unset
+indent_size = unset

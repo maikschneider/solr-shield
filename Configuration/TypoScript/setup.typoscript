@@ -1,8 +1,4 @@
-# Solr Shield TypoScript setup.
-#
-# NOTE: The client-side bot-detection layer (window.SolrShield config + the
-# solr-shield.js footer include) is under development on the
-# `feature/js-bot-detection` branch and is intentionally NOT wired up on main.
-# When that branch lands, the JS include and config injection are re-added here.
-#
-# The server-side URI-obfuscation layer requires no TypoScript and works as-is.
+[site("settings").get("solrShield.botDetection.enabled")]
+  page.includeJSFooter.solrShield = EXT:solr_shield/Resources/Public/JavaScript/solr-shield.js
+  page.includeJSFooter.solrShield.defer = 1
+[END]
