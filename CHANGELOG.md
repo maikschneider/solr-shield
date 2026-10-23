@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Per-site configuration via site settings (`solrShield.uriObfuscation.*`, `solrShield.botDetection.*`).
 - Quality tooling: php-cs-fixer, PHPStan (+ phpstan-typo3), Rector, editorconfig-cli, composer-normalize, TypoScript lint, translation validation, and a GitHub Actions SCA workflow.
 - Server-side bot-detection validator (`BotDetectionService`), shipped **disabled by default**.
+- **Documentation on docs.typo3.org**: introduction, installation, site settings, how the signed parameter, the form rewrite and the middleware work, and known problems. The README is now a short overview that links there ([#5](https://github.com/maikschneider/solr-shield/issues/5)).
 - **Extension icon** in the style of the other `maikschneider/*` extensions: a shield with a magnifying glass, white on black ([#3](https://github.com/maikschneider/solr-shield/issues/3)).
 - **Unit and functional tests.** Unit tests cover the token, the bot-detection scoring and both link listeners; functional tests run the middleware stack through frontend sub-requests: signed, unsigned and forged payloads, `_s[…]` form fields, the suggest page type, both reject actions, disabled obfuscation and the HTML rewrite. CI runs them for PHP 8.2–8.4 on TYPO3 13.4 and 14.3 and uploads coverage to Codecov ([#4](https://github.com/maikschneider/solr-shield/issues/4)).
 
