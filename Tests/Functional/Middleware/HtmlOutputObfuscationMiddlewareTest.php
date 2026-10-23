@@ -24,7 +24,7 @@ final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCa
     {
         $html = (string)$this->request('/form')->getBody();
 
-        self::assertSame(1, substr_count($html, 'name="_ss"'));
+        self::assertSame(2, substr_count($html, 'name="_ss"'));
         self::assertMatchesRegularExpression('#<form id="search".*name="_ss".*</form>#s', explode('<form id="newsletter"', $html)[0]);
     }
 
@@ -62,6 +62,44 @@ final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCa
         $query = $this->echoed($this->request('/search?_ss=' . rawurlencode($ss)))['query'];
 
         self::assertSame(['tx_solr' => ['q' => 'name="tx_solr[']], $query);
+    }
+
+    #[Test]
+    public function suggestUrlIsSignedWithAnEmptyPayload(): void
+    {
+        parse_str((string)parse_url($this->suggestUrl('search'), PHP_URL_QUERY), $query);
+
+        self::assertSame('7384', $query['type'] ?? null);
+        self::assertSame('0', $query['L'] ?? null);
+        self::assertIsString($query['_ss'] ?? null);
+        self::assertSame(
+            ['p' => '', 's' => $this->get(TokenService::class)->generateToken()],
+            json_decode((string)base64_decode($query['_ss'], true), true)
+        );
+    }
+
+    #[Test]
+    public function suggestUrlThatAlreadyCarriesSsIsKept(): void
+    {
+        self::assertSame('/?type=7384&_ss=FILTERS', $this->suggestUrl('filtered'));
+    }
+
+    #[Test]
+    public function autocompleteRequestToTheRewrittenSuggestUrlPasses(): void
+    {
+        $query = $this->echoed($this->request($this->suggestUrl('search') . '&tx_solr%5BqueryString%5D=fo'))['query'];
+
+        self::assertSame(['type' => '7384', 'L' => '0', 'tx_solr' => ['queryString' => 'fo']], $query);
+    }
+
+    private function suggestUrl(string $formId): string
+    {
+        $html = (string)$this->request('/form')->getBody();
+        preg_match('/<form id="' . $formId . '"[^>]*\sdata-suggest="([^"]+)"/', $html, $matches);
+        $value = $matches[1] ?? '';
+        self::assertNotSame('', $value, $html);
+
+        return html_entity_decode($value, ENT_QUOTES);
     }
 
     private function injectedSs(): string
