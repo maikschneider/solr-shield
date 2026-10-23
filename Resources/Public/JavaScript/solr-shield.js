@@ -40,8 +40,7 @@
     ts: Date.now(),
   }));
 
-  document.addEventListener('submit', (event) => {
-    const form = event.target;
+  const signForm = (form) => {
     if (!(form instanceof HTMLFormElement) || !form.querySelector('input[name="_ss"]')) {
       return;
     }
@@ -53,7 +52,15 @@
       form.appendChild(field);
     }
     field.value = payload();
-  }, true);
+  };
+  document.addEventListener('submit', (event) => signForm(event.target), true);
+
+  // form.submit() fires no submit event; EXT:solr's results-per-page select uses it.
+  const nativeSubmit = HTMLFormElement.prototype.submit;
+  HTMLFormElement.prototype.submit = function submit() {
+    signForm(this);
+    nativeSubmit.call(this);
+  };
 
   // The href is rewritten at the last moment, right before the browser (or a
   // script that loads the link via AJAX) reads it, so the payload is fresh.
@@ -64,6 +71,10 @@
     }
     const url = new URL(link.href, window.location.href);
     if (url.origin !== window.location.origin || !url.searchParams.has('_ss')) {
+      return;
+    }
+    // A fragment link inherits the page's query; changing it would reload the search.
+    if (url.hash && url.href.split('#')[0] === window.location.href.split('#')[0]) {
       return;
     }
     url.searchParams.set('_solr_bot', payload());
