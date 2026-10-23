@@ -70,7 +70,7 @@ final class BotDetectionTest extends AbstractMiddlewareTestCase
     {
         $echoed = $this->echoed($this->request('/search', [
             '_s' => ['q' => 'foo'],
-            '_ss' => $this->signedPayload(''),
+            '_ss' => $this->signedPayload('', ['[q]']),
             '_solr_bot' => self::botPayload(),
         ]));
 
@@ -82,7 +82,7 @@ final class BotDetectionTest extends AbstractMiddlewareTestCase
     {
         $echoed = $this->echoed($this->request($this->signedUri('tx_solr%5Bq%5D=bar', self::botPayload(['webdriver' => true])), [
             '_s' => ['q' => 'foo'],
-            '_ss' => $this->signedPayload(''),
+            '_ss' => $this->signedPayload('', ['[q]']),
             '_solr_bot' => self::botPayload(),
         ]));
 

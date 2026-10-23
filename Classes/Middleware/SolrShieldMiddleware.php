@@ -115,7 +115,12 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
     {
         $queryParams = $request->getQueryParams();
         $parsedBody = (array)($request->getParsedBody() ?? []);
-        $rawSs = $this->extractParam($queryParams, $parsedBody, '_ss');
+        // A form posted to a URL that came from a signed link carries the link's
+        // `_ss` in the query; the form's own `_ss`, which signs its fields, is in the body.
+        $rawSs = $this->extractParam([], $parsedBody, '_ss');
+        if ($rawSs === '') {
+            $rawSs = $this->extractParam($queryParams, null, '_ss');
+        }
         $hasFormFields = isset($queryParams['_s']) || isset($parsedBody['_s']);
 
         if ($isSuggestRequest) {
