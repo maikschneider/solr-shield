@@ -1,0 +1,13 @@
+base: 'http://localhost/'
+dependencies:
+  - maikschneider/solr-shield-test
+  - apache-solr-for-typo3/solr-example-facets-date-range
+  - apache-solr-for-typo3/solr-example-numeric-range
+languages:
+  -
+    title: English
+    enabled: true
+    locale: en_US
+    base: /
+    languageId: 0
+rootPageId: 1

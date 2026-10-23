@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace MaikSchneider\SolrShield\Middleware;
 
+use MaikSchneider\SolrShield\Service\PublicResourceResolver;
 use MaikSchneider\SolrShield\Service\TokenService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use TYPO3\CMS\Core\Information\Typo3Version;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
 /**
@@ -21,12 +23,18 @@ use TYPO3\CMS\Core\Site\Entity\Site;
  * field carrying a server-signed token so that SolrShieldMiddleware can
  * validate and remap the submitted `_s[…]` parameters back to `tx_solr[…]`
  * without requiring JavaScript.
+ *
+ * EXT:solr's range facet scripts are swapped for patched copies that can
+ * fill a range into the signed `_ss` payload.
  */
 final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterface
 {
+    private const RANGE_FACET_SCRIPTS = ['facet_daterange_controller.js', 'facet_numericrange_controller.js'];
+
     public function __construct(
         private TokenService $tokenService,
         private StreamFactoryInterface $streamFactory,
+        private PublicResourceResolver $resourceResolver,
     ) {
     }
 
@@ -43,7 +51,7 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
         }
 
         $body = (string)$response->getBody();
-        $modified = $this->signSuggestUrls($this->rewriteFieldNames($body));
+        $modified = $this->replaceRangeFacetScripts($this->signSuggestUrls($this->rewriteFieldNames($body)));
 
         if ($modified === $body) {
             return $response;
@@ -103,6 +111,32 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
         );
 
         return $result ?? $html;
+    }
+
+    /**
+     * Point script tags that load EXT:solr's range facet controllers to the
+     * patched copies. Their URL templates sit inside the signed `_ss` payload,
+     * and they navigate through a link click so solr-shield.js can sign it.
+     */
+    private function replaceRangeFacetScripts(string $html): string
+    {
+        $version = (new Typo3Version())->getMajorVersion() >= 14 ? 'v14' : 'v13';
+
+        foreach (self::RANGE_FACET_SCRIPTS as $script) {
+            if (!str_contains($html, $script)) {
+                continue;
+            }
+            $stock = $this->resourceResolver->resolve('EXT:solr/Resources/Public/JavaScript/' . $script);
+            $patched = $this->resourceResolver->resolve('EXT:solr_shield/Resources/Public/JavaScript/Solr/' . $version . '/' . $script, true);
+
+            $html = preg_replace_callback(
+                '/(\ssrc=)(["\'])[^"\']*' . preg_quote($stock, '/') . '(?:\?[^"\']*)?\2/i',
+                static fn (array $matches): string => $matches[1] . $matches[2] . htmlspecialchars($patched, ENT_QUOTES) . $matches[2],
+                $html
+            ) ?? $html;
+        }
+
+        return $html;
     }
 
     /**

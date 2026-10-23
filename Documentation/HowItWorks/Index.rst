@@ -59,6 +59,27 @@ hidden ``_ss`` field with an empty payload to each form that contains such a
 field. Submitting the form sends ``_s[…]`` plus ``_ss``, so the search form
 works without JavaScript.
 
+..  _how-it-works-range-facets:
+
+Range facets
+============
+
+EXT:solr's date and numeric range facets build their URL in the browser:
+``facet_daterange_controller.js`` and ``facet_numericrange_controller.js``
+replace the ``___FROM___`` and ``___TO___`` placeholders of a URL template
+and assign the result to ``window.location``. With URI obfuscation, the
+template's ``tx_solr`` parameters sit inside ``_ss``, where these scripts
+cannot find the placeholders, and the navigation bypasses ``solr-shield.js``.
+
+The middleware ``maikschneider/solr-shield-html`` therefore points every
+``<script>`` tag that loads EXT:solr's copy of these files to patched copies
+in ``EXT:solr_shield/Resources/Public/JavaScript/Solr/``, one set for
+EXT:solr 13 and one for EXT:solr 14. The patched scripts fill the range into
+the ``_ss`` payload and follow the URL through a link click, which
+``solr-shield.js`` signs like any other link. It does not matter how the
+stock scripts are included, for example through EXT:solr's example site sets
+or your own TypoScript.
+
 ..  _how-it-works-middleware:
 
 Incoming requests

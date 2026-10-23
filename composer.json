@@ -79,7 +79,7 @@
 	},
 	"scripts": {
 		"ci:composer:normalize": "@composer normalize --no-check-lock --dry-run",
-		"ci:editorconfig:lint": "ec --strict --git-only -n",
+		"ci:editorconfig:lint": "ec --strict --git-only -n -e Resources/Public/JavaScript/Solr",
 		"ci:language:lint": "composer validate-translations Resources/Private/Language",
 		"ci:php:fixer": "php-cs-fixer --config=php-cs-fixer.php fix --dry-run --format=checkstyle > php-cs-fixer.xml || true",
 		"ci:php:lint": "find *.php . -name '*.php' ! -path './vendor/*'  ! -path './var/*' ! -path '*node_modules/*' ! -path '*public/*' -print0 | xargs -0 -n 1 -P 4 php -l",
@@ -99,7 +99,7 @@
 		"ci:typoscript:lint": "typoscript-lint --fail-on-warnings",
 		"ci:yaml:lint": "find ./ ! -path './vendor/*' ! -path '*/node_modules/*' ! -path './.ddev/*' ! -path './public/*' ! -path './var/*' \\( -name '*.yaml' -o -name '*.yml' \\) | xargs -r yaml-lint",
 		"composer:normalize": "@composer normalize --no-check-lock",
-		"editorconfig:lint": "ec --strict --fix --git-only -n",
+		"editorconfig:lint": "ec --strict --fix --git-only -n -e Resources/Public/JavaScript/Solr",
 		"language:lint": "composer validate-translations Resources/Private/Language",
 		"php:fixer": "php-cs-fixer --config=php-cs-fixer.php fix",
 		"php:lint": "find *.php . -name '*.php' ! -path './vendor/*'  ! -path './var/*' ! -path '*node_modules/*' ! -path '*public/*' -print0 | xargs -0 -n 1 -P 4 php -l",
