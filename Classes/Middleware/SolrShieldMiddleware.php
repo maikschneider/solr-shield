@@ -16,8 +16,8 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 
 /**
  * PSR-15 middleware providing two independent Solr security layers:
- * 1. URI obfuscation: every Solr request must carry a single signed `_ss` parameter
- *    containing the tx_solr payload (`p`) and a token signature (`s`).
+ * 1. URI obfuscation: every Solr request must carry a signed `_ss` parameter
+ *    whose signature covers the tx_solr payload (see TokenService).
  *    Direct tx_solr[…] requests are rejected.
  * 2. Bot detection: a JS-collected behavioural signal payload (_solr_bot) is
  *    validated; requests that fail the heuristics are rejected.
@@ -39,33 +39,18 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
     {
         $settings = $this->readSettings($request);
 
-        if ($settings['uriObfuscation']['enabled']) {
-            $request = $this->remapSParams($request);
-        }
-
         $queryParams = $request->getQueryParams();
         $parsedBody = $request->getParsedBody();
         $isSuggestRequest = (int)($queryParams['type'] ?? 0) === self::SUGGEST_PAGE_TYPE;
-        $hasTxSolr = $this->hasTxSolrParams($queryParams) || $this->hasTxSolrParams((array)($parsedBody ?? []));
         $hasSs = isset($queryParams['_ss']) || isset(((array)($parsedBody ?? []))['_ss']);
 
         // --- Protection 1: URI Obfuscation ---
         if ($settings['uriObfuscation']['enabled']) {
-            if ($hasSs) {
-                // Signed payload present — validate signature and decode
-                $raw = $this->extractParam($queryParams, $parsedBody, '_ss');
-                $decoded = $this->validateAndDecode($raw);
-                if ($decoded === null) {
-                    return $this->reject($request, $settings['uriObfuscation']['rejectAction']);
-                }
-                // Suggest requests carry the typed tx_solr[queryString] next to
-                // the signed additionalFilters, so the payload is merged into
-                // the request instead of replacing its tx_solr parameters.
-                $request = $this->injectDecodedParams($request, $decoded, $isSuggestRequest);
-            } elseif ($hasTxSolr || $isSuggestRequest) {
-                // Direct tx_solr request or suggest without signed payload → reject
+            $decodedRequest = $this->decodeSolrParameters($request, $isSuggestRequest);
+            if ($decodedRequest === null) {
                 return $this->reject($request, $settings['uriObfuscation']['rejectAction']);
             }
+            $request = $decodedRequest;
         }
 
         // --- Protection 2: Bot Detection ---
@@ -118,14 +103,66 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
     }
 
     /**
-     * Map `_s[…]` parameters back to `tx_solr[…]` for the no-JS form path.
-     * HtmlOutputObfuscationMiddleware replaces `name="tx_solr[` with `name="_s[`
-     * in the rendered HTML; this reverses that mapping on inbound requests.
+     * Turn the signed `_ss` payload and, for forms, the `_s[…]` fields back
+     * into `tx_solr` parameters. Returns null when the request must be rejected.
+     *
+     * - Raw `tx_solr` parameters are never accepted, except the typed
+     *   `tx_solr[queryString]` of an autocomplete request.
+     * - `_s[…]` fields must be listed as free fields in the signed payload of
+     *   their form, or match one of its signed hidden values.
      */
-    private function remapSParams(ServerRequestInterface $request): ServerRequestInterface
+    private function decodeSolrParameters(ServerRequestInterface $request, bool $isSuggestRequest): ?ServerRequestInterface
     {
-        $queryParams = $this->remapSArray($request->getQueryParams());
-        $parsedBody = $this->remapSArray((array)($request->getParsedBody() ?? []));
+        $queryParams = $request->getQueryParams();
+        $parsedBody = (array)($request->getParsedBody() ?? []);
+        // A form posted to a URL that came from a signed link carries the link's
+        // `_ss` in the query; the form's own `_ss`, which signs its fields, is in the body.
+        $rawSs = $this->extractParam([], $parsedBody, '_ss');
+        if ($rawSs === '') {
+            $rawSs = $this->extractParam($queryParams, null, '_ss');
+        }
+        $hasFormFields = isset($queryParams['_s']) || isset($parsedBody['_s']);
+
+        if ($isSuggestRequest) {
+            if ($this->hasTxSolrParams($parsedBody) || $hasFormFields || !$this->isTypedSuggestQuery($queryParams)) {
+                return null;
+            }
+        } elseif ($this->hasTxSolrParams($queryParams) || $this->hasTxSolrParams($parsedBody)) {
+            return null;
+        }
+
+        if ($rawSs === '') {
+            return ($isSuggestRequest || $hasFormFields || isset($queryParams['_ss']) || isset($parsedBody['_ss'])) ? null : $request;
+        }
+        $payload = $this->tokenService->decode($rawSs);
+        if ($payload === null) {
+            return null;
+        }
+        unset($queryParams['_ss'], $parsedBody['_ss']);
+
+        if ($isSuggestRequest) {
+            $queryParams = array_replace_recursive($queryParams, $payload['params']);
+        } elseif ($hasFormFields) {
+            if (isset($queryParams['_s'], $parsedBody['_s'])) {
+                return null;
+            }
+            $inBody = isset($parsedBody['_s']);
+            $submitted = $inBody ? $parsedBody['_s'] : $queryParams['_s'];
+            $signed = is_array($payload['params']['tx_solr'] ?? null) ? $payload['params']['tx_solr'] : [];
+            if (!is_array($submitted) || !$this->isAllowedFormSubmission($submitted, $signed, $payload['freeFields'])) {
+                return null;
+            }
+            $txSolr = array_replace_recursive($submitted, $signed);
+            if ($inBody) {
+                unset($parsedBody['_s']);
+                $parsedBody['tx_solr'] = $txSolr;
+            } else {
+                unset($queryParams['_s']);
+                $queryParams['tx_solr'] = $txSolr;
+            }
+        } else {
+            $queryParams = array_merge($queryParams, $payload['params']);
+        }
 
         return $request
             ->withQueryParams($queryParams)
@@ -133,17 +170,80 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
     }
 
     /**
-     * @param array<array-key, mixed> $params
-     * @return array<array-key, mixed>
+     * @param array<array-key, mixed> $queryParams
      */
-    private function remapSArray(array $params): array
+    private function isTypedSuggestQuery(array $queryParams): bool
     {
-        if (!isset($params['_s']) || !is_array($params['_s'])) {
-            return $params;
+        foreach ($queryParams as $key => $value) {
+            if (!str_starts_with((string)$key, 'tx_solr')) {
+                continue;
+            }
+            if ($key !== 'tx_solr' || !is_array($value) || array_keys($value) !== ['queryString'] || !is_string($value['queryString'])) {
+                return false;
+            }
         }
-        $params['tx_solr'] = $params['_s'];
-        unset($params['_s']);
-        return $params;
+        return true;
+    }
+
+    /**
+     * @param array<array-key, mixed> $submitted
+     * @param array<array-key, mixed> $signed
+     * @param list<string> $freeFields
+     */
+    private function isAllowedFormSubmission(array $submitted, array $signed, array $freeFields): bool
+    {
+        $signedValues = $this->flatten($signed);
+        foreach ($this->flatten($submitted) as $path => $value) {
+            if (array_key_exists($path, $signedValues)) {
+                if ($signedValues[$path] !== $value) {
+                    return false;
+                }
+                continue;
+            }
+            if (!$this->isFreeField($path, $freeFields)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * @param list<string> $freeFields
+     */
+    private function isFreeField(string $path, array $freeFields): bool
+    {
+        foreach ($freeFields as $freeField) {
+            if ($path === $freeField) {
+                return true;
+            }
+            if (str_ends_with($freeField, '[]')
+                && preg_match('/^' . preg_quote(substr($freeField, 0, -2), '/') . '\[\d+\]$/', $path) === 1
+            ) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Flatten nested parameters into `[a][b]` paths, the notation of the field
+     * names in the form.
+     *
+     * @param array<array-key, mixed> $params
+     * @return array<string, mixed>
+     */
+    private function flatten(array $params, string $prefix = ''): array
+    {
+        $flat = [];
+        foreach ($params as $key => $value) {
+            $path = $prefix . '[' . $key . ']';
+            if (is_array($value)) {
+                $flat += $this->flatten($value, $path);
+            } else {
+                $flat[$path] = $value;
+            }
+        }
+        return $flat;
     }
 
     /**
@@ -169,37 +269,6 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
         return is_string($value) ? $value : '';
     }
 
-    /**
-     * Validate the token signature embedded in `_ss` and decode the payload.
-     * Format: base64(JSON({"p": "<querystring>", "s": "<token>"}))
-     * Returns the decoded tx_solr params on success (may be empty array for suggest),
-     * or null if the signature is invalid or the payload is malformed.
-     *
-     * @return array<array-key, mixed>|null
-     */
-    private function validateAndDecode(string $raw): ?array
-    {
-        if ($raw === '') {
-            return null;
-        }
-        $json = base64_decode($raw, true);
-        if ($json === false) {
-            return null;
-        }
-        $data = json_decode($json, true);
-        if (!is_array($data) || !isset($data['s'], $data['p']) || !is_string($data['s']) || !is_string($data['p'])) {
-            return null;
-        }
-        if (!$this->tokenService->isValidToken($data['s'])) {
-            return null;
-        }
-        if ($data['p'] === '') {
-            return [];
-        }
-        parse_str($data['p'], $decoded);
-        return $decoded !== [] ? $decoded : [];
-    }
-
     private function reject(ServerRequestInterface $request, string $action): ResponseInterface
     {
         if ($action === '403') {
@@ -208,25 +277,6 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
 
         $referer = $request->getHeaderLine('Referer');
         return new RedirectResponse($referer !== '' ? $referer : '/', 302);
-    }
-
-    /**
-     * @param array<array-key, mixed> $decodedParams
-     */
-    private function injectDecodedParams(ServerRequestInterface $request, array $decodedParams, bool $merge): ServerRequestInterface
-    {
-        $queryParams = $request->getQueryParams();
-        unset($queryParams['_ss']);
-        $queryParams = $merge
-            ? array_replace_recursive($queryParams, $decodedParams)
-            : array_merge($queryParams, $decodedParams);
-
-        $parsedBody = (array)($request->getParsedBody() ?? []);
-        unset($parsedBody['_ss']);
-
-        return $request
-            ->withQueryParams($queryParams)
-            ->withParsedBody($parsedBody ?: null);
     }
 
     /**

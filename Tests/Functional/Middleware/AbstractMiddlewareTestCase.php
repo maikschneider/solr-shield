@@ -67,12 +67,17 @@ abstract class AbstractMiddlewareTestCase extends FunctionalTestCase
         return ['query' => $data['query'], 'body' => is_array($data['body'] ?? null) ? $data['body'] : null];
     }
 
-    protected function signedPayload(string $txSolrQuery, ?string $token = null): string
+    /**
+     * @param list<string> $freeFields
+     */
+    protected function signedPayload(string $txSolrQuery, array $freeFields = []): string
     {
-        return base64_encode((string)json_encode([
-            'p' => $txSolrQuery,
-            's' => $token ?? $this->get(TokenService::class)->generateToken(),
-        ]));
+        return $this->get(TokenService::class)->encode($txSolrQuery, $freeFields);
+    }
+
+    protected function payloadWithSignature(string $txSolrQuery, string $signature): string
+    {
+        return base64_encode((string)json_encode(['p' => $txSolrQuery, 's' => $signature]));
     }
 
     protected function assertRedirectsTo(string $location, ResponseInterface $response): void

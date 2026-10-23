@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace MaikSchneider\SolrShield\Tests\Functional\Middleware;
 
-use MaikSchneider\SolrShield\Service\TokenService;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 
@@ -66,7 +65,7 @@ final class SolrShieldMiddlewareTest extends AbstractMiddlewareTestCase
     #[Test]
     public function obfuscatedFormFieldsAreMappedBackToTxSolr(): void
     {
-        $uri = '/search?_s%5Bq%5D=foo&_s%5Bfilter%5D%5B0%5D=type%3Apages&_ss=' . rawurlencode($this->signedPayload(''));
+        $uri = '/search?_s%5Bq%5D=foo&_s%5Bfilter%5D%5B0%5D=type%3Apages&_ss=' . rawurlencode($this->signedPayload('tx_solr%5Bfilter%5D%5B0%5D=type%3Apages', ['[q]']));
 
         $query = $this->echoed($this->request($uri))['query'];
 
@@ -76,7 +75,7 @@ final class SolrShieldMiddlewareTest extends AbstractMiddlewareTestCase
     #[Test]
     public function obfuscatedFormFieldsInPostBodyAreMappedBackToTxSolr(): void
     {
-        $echoed = $this->echoed($this->request('/search', ['_s' => ['q' => 'foo'], '_ss' => $this->signedPayload('')]));
+        $echoed = $this->echoed($this->request('/search', ['_s' => ['q' => 'foo'], '_ss' => $this->signedPayload('', ['[q]'])]));
 
         self::assertSame(['tx_solr' => ['q' => 'foo']], $echoed['body']);
     }
@@ -130,7 +129,7 @@ final class SolrShieldMiddlewareTest extends AbstractMiddlewareTestCase
     #[Test]
     public function signedPayloadWithoutQueryStringIsRejected(): void
     {
-        $ss = base64_encode((string)json_encode(['s' => $this->get(TokenService::class)->generateToken()]));
+        $ss = base64_encode((string)json_encode(['s' => 'AAAAAAAAAAAAAAAA']));
 
         $this->assertRedirectsTo('/', $this->request('/search?_ss=' . rawurlencode($ss)));
     }
@@ -138,7 +137,7 @@ final class SolrShieldMiddlewareTest extends AbstractMiddlewareTestCase
     #[Test]
     public function signedPayloadWithNonStringQueryStringIsRejected(): void
     {
-        $ss = base64_encode((string)json_encode(['p' => ['tx_solr' => ['q' => 'foo']], 's' => $this->get(TokenService::class)->generateToken()]));
+        $ss = base64_encode((string)json_encode(['p' => ['tx_solr' => ['q' => 'foo']], 's' => 'AAAAAAAAAAAAAAAA']));
 
         $this->assertRedirectsTo('/', $this->request('/search?_ss=' . rawurlencode($ss)));
     }
@@ -152,7 +151,7 @@ final class SolrShieldMiddlewareTest extends AbstractMiddlewareTestCase
     #[Test]
     public function payloadWithForgedSignatureIsRejected(): void
     {
-        $ss = $this->signedPayload('tx_solr%5Bq%5D=foo', 'AAAAAAAAAAAAAAAA');
+        $ss = $this->payloadWithSignature('tx_solr%5Bq%5D=foo', 'AAAAAAAAAAAAAAAA');
 
         $this->assertRedirectsTo('/', $this->request('/search?_ss=' . rawurlencode($ss)));
     }

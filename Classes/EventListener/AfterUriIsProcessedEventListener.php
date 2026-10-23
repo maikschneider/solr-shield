@@ -54,11 +54,7 @@ final readonly class AfterUriIsProcessedEventListener
             ARRAY_FILTER_USE_KEY
         );
 
-        // Single signed parameter: p = tx_solr query string, s = HMAC token
-        $payload = base64_encode((string)json_encode([
-            'p' => http_build_query($txSolrParams),
-            's' => $this->tokenService->generateToken(),
-        ]));
+        $payload = $this->tokenService->encode(http_build_query($txSolrParams));
 
         $newParams = array_merge($otherParams, ['_ss' => $payload]);
 

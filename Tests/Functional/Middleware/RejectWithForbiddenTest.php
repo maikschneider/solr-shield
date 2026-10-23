@@ -24,7 +24,7 @@ final class RejectWithForbiddenTest extends AbstractMiddlewareTestCase
     #[Test]
     public function forgedSignatureIsForbidden(): void
     {
-        $ss = $this->signedPayload('tx_solr%5Bq%5D=foo', 'AAAAAAAAAAAAAAAA');
+        $ss = $this->payloadWithSignature('tx_solr%5Bq%5D=foo', 'AAAAAAAAAAAAAAAA');
 
         self::assertSame(403, $this->request('/search?_ss=' . rawurlencode($ss))->getStatusCode());
     }

@@ -4,12 +4,12 @@
 Known problems
 ==============
 
-The token does not cover the payload
-    The token in ``_ss`` is the same for every link and appears on every
-    search page, so a client that reads one page can build ``_ss`` values
-    for any parameter combination. Solr Shield stops crawlers that follow or
-    mutate ``tx_solr`` links, not a bot written against it
-    (`#6 <https://github.com/maikschneider/solr-shield/issues/6>`__).
+Signed links can still be crawled
+    Every link Solr Shield signs stays valid, and each result page links to
+    further filter combinations. A crawler that follows links reaches every
+    combination the site renders, just no others. Free form fields, the
+    search term above all, accept any value. Bot detection limits the
+    former; caching or rate limiting the search page limits both.
 
 Redirects follow the ``Referer``
     With ``rejectAction: redirect``, a rejected request is redirected to
