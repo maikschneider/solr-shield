@@ -78,6 +78,18 @@ final class BotDetectionTest extends AbstractMiddlewareTestCase
     }
 
     #[Test]
+    public function formSubmissionPrefersThePayloadInTheBodyOverTheOneInTheUrl(): void
+    {
+        $echoed = $this->echoed($this->request($this->signedUri('tx_solr%5Bq%5D=bar', self::botPayload(['webdriver' => true])), [
+            '_s' => ['q' => 'foo'],
+            '_ss' => $this->signedPayload(''),
+            '_solr_bot' => self::botPayload(),
+        ]));
+
+        self::assertSame(['tx_solr' => ['q' => 'foo']], $echoed['body']);
+    }
+
+    #[Test]
     public function signedSuggestRequestNeedsNoPayload(): void
     {
         $response = $this->request('/?type=7384&tx_solr%5BqueryString%5D=fo&_ss=' . rawurlencode($this->signedPayload('')));

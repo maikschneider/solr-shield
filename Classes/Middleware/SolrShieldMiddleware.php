@@ -70,7 +70,12 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
 
         // --- Protection 2: Bot Detection ---
         if ($settings['botDetection']['enabled'] && !$isSuggestRequest && $hasSs) {
-            $botPayload = $this->extractParam($queryParams, $parsedBody, '_solr_bot');
+            // A form posted to a URL that came from a signed link carries that
+            // link's older payload in the query; the one in the body is fresh.
+            $botPayload = $this->extractParam([], $parsedBody, '_solr_bot');
+            if ($botPayload === '') {
+                $botPayload = $this->extractParam($queryParams, null, '_solr_bot');
+            }
             if ($botPayload === '') {
                 return $this->reject($request, $settings['uriObfuscation']['rejectAction']);
             }
