@@ -107,4 +107,46 @@ final class BotDetectionServiceTest extends UnitTestCase
 
         self::assertFalse((new BotDetectionService())->isHuman($payload, ['securityLevel' => 10]));
     }
+
+    #[Test]
+    public function webdriverAloneRejects(): void
+    {
+        self::assertFalse((new BotDetectionService())->isHuman(self::payload(['webdriver' => true]), ['securityLevel' => 0]));
+    }
+
+    #[Test]
+    public function headlessDefaultScreenSizeAloneRejects(): void
+    {
+        $payload = self::payload(['screenWidth' => 800, 'screenHeight' => 600]);
+
+        self::assertFalse((new BotDetectionService())->isHuman($payload, ['securityLevel' => 0]));
+    }
+
+    #[Test]
+    public function securityLevelAboveTheNumberOfChecksIsCapped(): void
+    {
+        self::assertTrue((new BotDetectionService())->isHuman(self::payload(), ['securityLevel' => 99]));
+    }
+
+    #[Test]
+    public function nonNumericValuesCountAsZeroInsteadOfFailingWithAnError(): void
+    {
+        $payload = self::payload([
+            'screenWidth' => 'wide',
+            'screenHeight' => ['tall'],
+            'elapsed' => 'long',
+            'mouseMoveCount' => null,
+            'ts' => 'now',
+        ]);
+        $subject = new BotDetectionService();
+
+        self::assertFalse($subject->isHuman($payload, ['securityLevel' => 7]));
+        self::assertTrue($subject->isHuman($payload, ['securityLevel' => 5]));
+    }
+
+    #[Test]
+    public function numericStringsAreAccepted(): void
+    {
+        self::assertTrue((new BotDetectionService())->isHuman(self::payload(['elapsed' => '12', 'scrollCount' => '4']), ['securityLevel' => 10]));
+    }
 }

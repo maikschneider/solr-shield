@@ -73,6 +73,27 @@ numeric index.
 The ``data-suggest`` URL that EXT:solr's autocomplete reads gets a signed
 ``_ss`` as well, unless it already carries one.
 
+..  _how-it-works-range-facets:
+
+Range facets
+============
+
+EXT:solr's date and numeric range facets build their URL in the browser:
+``facet_daterange_controller.js`` and ``facet_numericrange_controller.js``
+replace the ``___FROM___`` and ``___TO___`` placeholders of a URL template
+and assign the result to ``window.location``. With URI obfuscation, the
+template's ``tx_solr`` parameters sit inside ``_ss``, where these scripts
+cannot find the placeholders, and the navigation bypasses ``solr-shield.js``.
+
+The middleware ``maikschneider/solr-shield-html`` therefore points every
+``<script>`` tag that loads EXT:solr's copy of these files to patched copies
+in ``EXT:solr_shield/Resources/Public/JavaScript/Solr/``, one set for
+EXT:solr 13 and one for EXT:solr 14. The patched scripts fill the range into
+the ``_ss`` payload and follow the URL through a link click, which
+``solr-shield.js`` signs like any other link. It does not matter how the
+stock scripts are included, for example through EXT:solr's example site sets
+or your own TypoScript.
+
 ..  _how-it-works-middleware:
 
 Incoming requests
@@ -104,3 +125,41 @@ The middleware ``maikschneider/solr-shield`` runs after
         - Rejected
     *   - No Solr parameters
         - Passed through
+
+..  _how-it-works-bot-detection:
+
+Bot detection
+=============
+
+With :confval:`setting-botDetection-enabled`, the site set includes
+``EXT:solr_shield/Resources/Public/JavaScript/solr-shield.js`` in the page
+footer. The script counts mouse, touch, scroll and key events and, right
+before a Solr form is submitted or a link carrying ``_ss`` is followed, adds
+a base64-encoded JSON payload as ``_solr_bot``:
+
+..  code-block:: json
+
+    {
+        "elapsed": 12, "webdriver": false,
+        "screenWidth": 1920, "screenHeight": 1080,
+        "viewportWidth": 1280, "viewportHeight": 800,
+        "mouseMoveCount": 30, "touchCount": 0,
+        "scrollCount": 4, "keyCount": 6,
+        "ts": 1760000000000
+    }
+
+The middleware scores every request that carries ``_ss``, except autocomplete
+requests, and removes ``_solr_bot`` before TYPO3 resolves the page:
+
+*   Rejected outright: ``webdriver`` is set, or the screen is 800×600, the
+    default of many headless browsers.
+*   Otherwise ten checks are counted: the two above, at least
+    :confval:`setting-botDetection-minFormTimeout` seconds since page load,
+    mouse or touch activity (see
+    :confval:`setting-botDetection-requireInteraction`), scrolling, key
+    presses, a viewport width and height, less than an hour since page load,
+    and a timestamp within ten minutes of the server time. At least
+    :confval:`setting-botDetection-securityLevel` of them must pass.
+
+A missing or failing payload is rejected like an unsigned request (see
+:confval:`setting-uriObfuscation-rejectAction`).

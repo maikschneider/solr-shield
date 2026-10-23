@@ -1,6 +1,6 @@
 base: 'http://localhost/'
 dependencies:
-  - maikschneider/solr-shield
+  - maikschneider/solr-shield-test
 languages:
   -
     title: English

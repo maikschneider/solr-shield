@@ -16,6 +16,26 @@ final class SolrShieldMiddlewareTest extends AbstractMiddlewareTestCase
     }
 
     #[Test]
+    public function botDetectionScriptIsNotIncludedByDefault(): void
+    {
+        $response = $this->request('/page');
+
+        self::assertSame(200, $response->getStatusCode(), (string)$response->getBody());
+        self::assertStringContainsString('Search page', (string)$response->getBody());
+        self::assertStringNotContainsString('solr-shield.js', (string)$response->getBody());
+    }
+
+    #[Test]
+    public function rangeFacetScriptsAreNotAddedWithoutTheStockScripts(): void
+    {
+        $response = $this->request('/page');
+
+        self::assertSame(200, $response->getStatusCode(), (string)$response->getBody());
+        self::assertStringNotContainsString('facet_daterange_controller', (string)$response->getBody());
+        self::assertStringNotContainsString('facet_numericrange_controller', (string)$response->getBody());
+    }
+
+    #[Test]
     public function signedPayloadIsDecodedIntoTxSolrParameters(): void
     {
         $ss = $this->signedPayload('tx_solr%5Bq%5D=foo&tx_solr%5Bfilter%5D%5B0%5D=type%3Apages');

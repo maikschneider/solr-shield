@@ -27,7 +27,7 @@ your Solr templates.
 Bot detection
 =============
 
-A second, behavioural layer that rejects headless and scripted clients is in
-development (`#8 <https://github.com/maikschneider/solr-shield/issues/8>`__).
-Its settings exist but are disabled by default; see
-:ref:`known-problems`.
+An optional second layer rejects headless and scripted clients. A small
+script records how the visitor interacts with the page and sends a summary
+with every search, which the server scores. See
+:ref:`how-it-works-bot-detection`.
