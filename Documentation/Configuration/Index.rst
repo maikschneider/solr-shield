@@ -72,7 +72,9 @@ Bot detection
     :type: int
     :default: 7
 
-    How many of the ten checks must pass. Values above 10 count as 10.
+    How many of the ten checks must pass. Values outside 0–10 are clamped,
+    so a negative value requires no counted check; ``webdriver`` and the
+    800×600 screen still reject on their own.
 
 ..  confval:: solrShield.botDetection.requireInteraction
     :name: setting-botDetection-requireInteraction
