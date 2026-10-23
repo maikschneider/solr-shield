@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Per-site configuration via site settings (`solrShield.uriObfuscation.*`, `solrShield.botDetection.*`).
 - Quality tooling: php-cs-fixer, PHPStan (+ phpstan-typo3), Rector, editorconfig-cli, composer-normalize, TypoScript lint, translation validation, and a GitHub Actions SCA workflow.
 - Server-side bot-detection validator (`BotDetectionService`), shipped **disabled by default**.
+- **Documentation on docs.typo3.org**: introduction, installation, site settings, how the signed parameter, the form rewrite and the middleware work, and known problems. The README is now a short overview that links there ([#5](https://github.com/maikschneider/solr-shield/issues/5)).
 
 ### Notes
 
