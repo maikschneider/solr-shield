@@ -13,7 +13,7 @@ All settings are site settings. Edit them in
     solrShield:
       uriObfuscation:
         enabled: true
-        rejectAction: redirect
+        rejectAction: '403'
 
 ..  _configuration-uri-obfuscation:
 
@@ -32,15 +32,17 @@ URI obfuscation
 ..  confval:: solrShield.uriObfuscation.rejectAction
     :name: setting-uriObfuscation-rejectAction
     :type: string
-    :default: redirect
+    :default: 403
 
     What happens to a rejected request:
 
-    ``redirect``
-        ``302`` to the ``Referer`` of the request, or to ``/`` without one.
-
     ``403``
         An empty ``403 Forbidden`` response.
+
+    ``redirect``
+        ``302`` to the ``Referer`` of the request if it has the same scheme,
+        host and port, otherwise to the site root. Only the path and query of
+        the referer are kept.
 
 ..  _configuration-bot-detection:
 

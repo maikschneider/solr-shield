@@ -120,11 +120,9 @@ final class SolrShieldMiddlewareTest extends AbstractMiddlewareTestCase
 
     #[Test]
     #[DataProvider('rejectedRequests')]
-    public function rejectedRequestRedirectsToReferer(string $uri): void
+    public function rejectedRequestIsForbidden(string $uri): void
     {
-        $response = $this->request($uri, null, ['Referer' => 'http://localhost/previous']);
-
-        $this->assertRedirectsTo('http://localhost/previous', $response);
+        $this->assertForbidden($this->request($uri, null, ['Referer' => 'http://localhost/previous']));
     }
 
     #[Test]
@@ -132,7 +130,7 @@ final class SolrShieldMiddlewareTest extends AbstractMiddlewareTestCase
     {
         $ss = base64_encode((string)json_encode(['s' => $this->get(TokenService::class)->generateToken()]));
 
-        $this->assertRedirectsTo('/', $this->request('/search?_ss=' . rawurlencode($ss)));
+        $this->assertForbidden($this->request('/search?_ss=' . rawurlencode($ss)));
     }
 
     #[Test]
@@ -140,13 +138,7 @@ final class SolrShieldMiddlewareTest extends AbstractMiddlewareTestCase
     {
         $ss = base64_encode((string)json_encode(['p' => ['tx_solr' => ['q' => 'foo']], 's' => $this->get(TokenService::class)->generateToken()]));
 
-        $this->assertRedirectsTo('/', $this->request('/search?_ss=' . rawurlencode($ss)));
-    }
-
-    #[Test]
-    public function rejectedRequestWithoutRefererRedirectsToRoot(): void
-    {
-        $this->assertRedirectsTo('/', $this->request('/search?tx_solr%5Bq%5D=foo'));
+        $this->assertForbidden($this->request('/search?_ss=' . rawurlencode($ss)));
     }
 
     #[Test]
@@ -154,12 +146,12 @@ final class SolrShieldMiddlewareTest extends AbstractMiddlewareTestCase
     {
         $ss = $this->signedPayload('tx_solr%5Bq%5D=foo', 'AAAAAAAAAAAAAAAA');
 
-        $this->assertRedirectsTo('/', $this->request('/search?_ss=' . rawurlencode($ss)));
+        $this->assertForbidden($this->request('/search?_ss=' . rawurlencode($ss)));
     }
 
     #[Test]
     public function unsignedTxSolrInPostBodyIsRejected(): void
     {
-        $this->assertRedirectsTo('/', $this->request('/search', ['tx_solr' => ['q' => 'foo']]));
+        $this->assertForbidden($this->request('/search', ['tx_solr' => ['q' => 'foo']]));
     }
 }
