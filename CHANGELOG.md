@@ -34,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Autocomplete works with URI obfuscation enabled.** EXT:solr's `data-suggest` URLs get a signed `_ss`, so suggest requests are no longer rejected, and signed `additionalFilters` now reach EXT:solr next to the typed `tx_solr[queryString]` ([#13](https://github.com/maikschneider/solr-shield/issues/13)).
 
+### Security
+
+- **`_ss` signatures cover the payload.** The signature used to be the same constant for every link, so any visitor could copy it from a search page and sign arbitrary filter combinations. It is now an HMAC over the signed `tx_solr` parameters. Each search form gets its own `_ss` that pins its hidden values and lists its free fields; raw `tx_solr` parameters next to a valid `_ss` are rejected, except `tx_solr[queryString]` on autocomplete requests. Links signed by earlier builds stop working ([#6](https://github.com/maikschneider/solr-shield/issues/6)).
+
 ### Notes
 
 - The client-side JavaScript bot-detection layer is **not part of `main`** yet ([#8](https://github.com/maikschneider/solr-shield/issues/8)). `main` ships only the server-side validator, disabled by default, until that work is complete.

@@ -9,6 +9,11 @@
 <form id="filtered" action="/search" method="get" data-suggest="/?type=7384&amp;_ss=FILTERS">
     <input type="text" name="tx_solr[q]" value="">
 </form>
+<form id="facets" action="/search" method="get">
+    <input type="hidden" name="tx_solr[filter][]" value="type:pages">
+    <label><input type="checkbox" name="tx_solr[filter][]" value="author:jane"> Jane</label>
+    <label><input type="checkbox" name="tx_solr[filter][]" value="author:joe"> Joe</label>
+</form>
 <form id="newsletter" action="/newsletter" method="post">
     <input type="email" name="email">
 </form>

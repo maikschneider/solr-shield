@@ -18,7 +18,7 @@ use TYPO3\CMS\Core\Site\Entity\Site;
  *
  * Every `name="tx_solr[` attribute is replaced with `name="_s[`.
  * Forms that contain such renamed inputs receive an injected hidden `_ss`
- * field carrying a server-signed token so that SolrShieldMiddleware can
+ * field signed for exactly that form, so that SolrShieldMiddleware can
  * validate and remap the submitted `_s[…]` parameters back to `tx_solr[…]`
  * without requiring JavaScript.
  */
@@ -86,7 +86,7 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
      */
     private function signSuggestUrls(string $html): string
     {
-        $payload = $this->buildEmptySsPayload();
+        $payload = $this->tokenService->encode('');
 
         $result = preg_replace_callback(
             '/(\sdata-suggest=)(["\'])(.*?)\2/si',
@@ -106,22 +106,22 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
     }
 
     /**
-     * Inject a hidden `_ss` token field into every form that carries `_s[`
-     * inputs so that SolrShieldMiddleware can validate the submission without JS.
+     * Inject a hidden `_ss` field into every form that carries `_s[` fields.
+     * Its payload signs the values of the form's hidden `_s[…]` fields and the
+     * names of the fields the visitor fills in, so a submission can neither
+     * change a hidden value nor add a field the form does not have.
      */
     private function injectSsTokenIntoForms(string $html): string
     {
-        $payload = $this->buildEmptySsPayload();
-        $hiddenField = '<input type="hidden" name="_ss" value="' . htmlspecialchars($payload, ENT_QUOTES) . '">';
-
         $result = preg_replace_callback(
             '/<form\b[^>]*>.*?<\/form>/si',
-            static function (array $matches) use ($hiddenField): string {
+            function (array $matches): string {
                 $form = $matches[0];
                 if (!str_contains($form, 'name="_s[') && !str_contains($form, "name='_s[")) {
                     return $form;
                 }
-                return str_replace('</form>', $hiddenField . '</form>', $form);
+                $hiddenField = '<input type="hidden" name="_ss" value="' . htmlspecialchars($this->signForm($form), ENT_QUOTES) . '">';
+                return substr_replace($form, $hiddenField, (int)strripos($form, '</form>'), 0);
             },
             $html
         );
@@ -129,15 +129,32 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
         return $result ?? $html;
     }
 
-    /**
-     * Build a signed empty-payload `_ss` value (token-only, no tx_solr params).
-     * SolrShieldMiddleware treats this as a valid proof-of-origin that decodes to [].
-     */
-    private function buildEmptySsPayload(): string
+    private function signForm(string $form): string
     {
-        return base64_encode((string)json_encode([
-            'p' => '',
-            's' => $this->tokenService->generateToken(),
-        ]));
+        $fixed = [];
+        $free = [];
+        preg_match_all('/<(?:input|select|textarea|button)\b[^>]*>/si', $form, $tags);
+        foreach ($tags[0] as $tag) {
+            $name = $this->attribute($tag, 'name');
+            if ($name === null || !str_starts_with($name, '_s[')) {
+                continue;
+            }
+            $path = substr($name, 2);
+            if (str_starts_with($tag, '<input') && strtolower((string)$this->attribute($tag, 'type')) === 'hidden') {
+                $fixed[] = rawurlencode('tx_solr' . $path) . '=' . rawurlencode((string)$this->attribute($tag, 'value'));
+            } else {
+                $free[$path] = $path;
+            }
+        }
+
+        return $this->tokenService->encode(implode('&', $fixed), array_values($free));
+    }
+
+    private function attribute(string $tag, string $name): ?string
+    {
+        if (preg_match('/\s' . $name . '\s*=\s*(["\'])(.*?)\1/si', $tag, $matches) !== 1) {
+            return null;
+        }
+        return html_entity_decode($matches[2], ENT_QUOTES | ENT_HTML5);
     }
 }

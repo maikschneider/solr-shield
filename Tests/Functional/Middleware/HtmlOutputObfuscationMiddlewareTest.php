@@ -24,16 +24,17 @@ final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCa
     {
         $html = (string)$this->request('/form')->getBody();
 
-        self::assertSame(2, substr_count($html, 'name="_ss"'));
+        self::assertSame(3, substr_count($html, 'name="_ss"'));
         self::assertMatchesRegularExpression('#<form id="search".*name="_ss".*</form>#s', explode('<form id="newsletter"', $html)[0]);
     }
 
     #[Test]
-    public function injectedTokenIsASignedEmptyPayload(): void
+    public function injectedTokenSignsHiddenValuesAndFreeFieldsOfItsForm(): void
     {
-        $data = json_decode((string)base64_decode($this->injectedSs(), true), true);
-
-        self::assertSame(['p' => '', 's' => $this->get(TokenService::class)->generateToken()], $data);
+        self::assertSame(
+            ['params' => ['tx_solr' => ['filter' => ['type:pages']]], 'freeFields' => ['[q]']],
+            $this->get(TokenService::class)->decode($this->injectedSs())
+        );
     }
 
     #[Test]
@@ -72,10 +73,7 @@ final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCa
         self::assertSame('7384', $query['type'] ?? null);
         self::assertSame('0', $query['L'] ?? null);
         self::assertIsString($query['_ss'] ?? null);
-        self::assertSame(
-            ['p' => '', 's' => $this->get(TokenService::class)->generateToken()],
-            json_decode((string)base64_decode($query['_ss'], true), true)
-        );
+        self::assertSame(['params' => [], 'freeFields' => []], $this->get(TokenService::class)->decode($query['_ss']));
     }
 
     #[Test]
