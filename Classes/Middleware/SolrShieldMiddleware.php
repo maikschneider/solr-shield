@@ -88,6 +88,11 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
     /**
      * Read settings from the site settings (set via settings.definitions.yaml).
      * Falls back to the defaults defined in settings.definitions.yaml.
+     *
+     * @return array{
+     *     uriObfuscation: array{enabled: bool, rejectAction: string},
+     *     botDetection: array{enabled: bool, minFormTimeout: int, securityLevel: int, requireInteraction: bool}
+     * }
      */
     private function readSettings(ServerRequestInterface $request): array
     {
@@ -125,6 +130,10 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
             ->withParsedBody($parsedBody ?: null);
     }
 
+    /**
+     * @param array<array-key, mixed> $params
+     * @return array<array-key, mixed>
+     */
     private function remapSArray(array $params): array
     {
         if (!isset($params['_s']) || !is_array($params['_s'])) {
@@ -135,6 +144,9 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
         return $params;
     }
 
+    /**
+     * @param array<array-key, mixed> $params
+     */
     private function hasTxSolrParams(array $params): bool
     {
         foreach (array_keys($params) as $key) {
@@ -145,11 +157,14 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
         return false;
     }
 
+    /**
+     * @param array<array-key, mixed> $queryParams
+     */
     private function extractParam(array $queryParams, mixed $parsedBody, string $name): string
     {
-        return (string)($queryParams[$name]
-            ?? ((array)($parsedBody ?? []))[$name]
-            ?? '');
+        $value = $queryParams[$name] ?? ((array)($parsedBody ?? []))[$name] ?? '';
+
+        return is_string($value) ? $value : '';
     }
 
     /**
@@ -157,6 +172,8 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
      * Format: base64(JSON({"p": "<querystring>", "s": "<token>"}))
      * Returns the decoded tx_solr params on success (may be empty array for suggest),
      * or null if the signature is invalid or the payload is malformed.
+     *
+     * @return array<array-key, mixed>|null
      */
     private function validateAndDecode(string $raw): ?array
     {
@@ -191,6 +208,9 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
         return new RedirectResponse($referer !== '' ? $referer : '/', 302);
     }
 
+    /**
+     * @param array<array-key, mixed> $decodedParams
+     */
     private function injectDecodedParams(ServerRequestInterface $request, array $decodedParams): ServerRequestInterface
     {
         $queryParams = $request->getQueryParams();
@@ -205,6 +225,9 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
             ->withParsedBody($parsedBody ?: null);
     }
 
+    /**
+     * @param list<string> $paramNames
+     */
     private function stripParams(ServerRequestInterface $request, array $paramNames): ServerRequestInterface
     {
         $queryParams = $request->getQueryParams();

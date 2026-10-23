@@ -1,54 +1,45 @@
-# Contributing to Solr Shield
+# Contributing to solr-shield
 
-Thanks for considering a contribution! Bug reports, ideas, and pull requests are all welcome.
+Thank you for considering contributing to solr-shield! We welcome contributions of all kinds.
 
 ## Local Development Setup
 
-This is a standard Composer-based TYPO3 extension.
+This extension uses DDEV for local development.
 
 ```bash
-git clone <your-fork>
-cd solr-shield
-composer install
+ddev start
+ddev composer install
+ddev init-typo3
 ```
 
-## Quality Tooling
+## Running Tests
 
-Before opening a pull request, run the static-analysis suite and fix anything it flags:
+Tests use the TYPO3 Testing Framework and PHPUnit.
 
 ```bash
-composer ci:sca   # check everything (read-only)
-composer fix      # auto-fix what can be fixed
+ddev exec vendor/bin/phpunit --testsuite Unit
+ddev exec vendor/bin/phpunit --testsuite Functional
 ```
 
-`ci:sca` runs, in order:
+## Code Quality Standards
 
-| Step | Tool |
-|------|------|
-| `ci:composer:normalize` | `ergebnis/composer-normalize` |
-| `ci:editorconfig:lint` | `armin/editorconfig-cli` |
-| `ci:php:lint` | `php -l` |
-| `ci:php:fixer` | `friendsofphp/php-cs-fixer` (TYPO3 CGL) |
-| `ci:language:lint` | `move-elevator/composer-translation-validator` |
-| `ci:php:stan` | `phpstan/phpstan` + `saschaegerer/phpstan-typo3` (level 7) |
-| `ci:rector` | `ssch/typo3-rector` |
-| `ci:typoscript:lint` | `helmich/typo3-typoscript-lint` |
+Please run all checks before submitting a pull request.
 
-The same suite runs in CI on every push and pull request (`.github/workflows/sca.yml`).
+```bash
+ddev composer sca
+```
 
-## Coding Standards
+Individual tools: `php:fixer`, `php:stan`, `php:rector`, `php:lint`, `yaml:lint`, `typoscript:lint`, `editorconfig:lint`, `language:lint`, `composer:normalize`.
 
-- PHP code follows the TYPO3 Coding Guidelines (enforced by php-cs-fixer).
-- `declare(strict_types=1);` in every PHP file.
-- New behaviour should be configurable via the site settings, not hardcoded.
+`ddev composer ci:sca` runs the same tools read-only, as in CI. Its `ci:php:fixer` and `ci:php:stan` steps write checkstyle reports (`php-cs-fixer.xml`, `phpstan.xml`) that CI turns into pull request annotations.
 
-## A Note on the JavaScript
+## Commits and Pull Requests
 
-`Resources/Public/JavaScript/solr-shield.js` is a work in progress. If you'd like to help finish the client-side bot-detection layer, that's a great place to start — open an issue first so we can align on the approach.
+* [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) (`feat:`, `fix:`, `docs:`, …)
+* One pull request per issue, body `Resolves #N.`
+* Add an entry to the `[Unreleased]` section of `CHANGELOG.md`
+* New behaviour is configured through the site settings, not hardcoded
 
-## Pull Requests
+## License
 
-1. Branch from `main`.
-2. Keep changes focused; one logical change per PR.
-3. Update `CHANGELOG.md` under `## [Unreleased]`.
-4. Make sure `composer ci:sca` is green.
+By contributing, you agree that your contributions will be licensed under GPL-2.0-or-later.
