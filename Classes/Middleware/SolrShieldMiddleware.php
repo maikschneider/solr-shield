@@ -103,8 +103,7 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
                 'rejectAction' => (string)($siteSettings?->get('solrShield.uriObfuscation.rejectAction', 'redirect') ?? 'redirect'),
             ],
             'botDetection' => [
-                // Defaults off on main: the client-side JS that produces the
-                // _solr_bot payload lives on the feature/js-bot-detection branch.
+                // Off by default: visitors without JavaScript cannot send a payload.
                 'enabled' => (bool)($siteSettings?->get('solrShield.botDetection.enabled', false) ?? false),
                 'minFormTimeout' => (int)($siteSettings?->get('solrShield.botDetection.minFormTimeout', 3) ?? 3),
                 'securityLevel' => (int)($siteSettings?->get('solrShield.botDetection.securityLevel', 7) ?? 7),

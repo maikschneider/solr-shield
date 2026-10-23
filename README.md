@@ -25,9 +25,10 @@ After:  /search?_ss=eyJwIjoidHhfc29sciU1QnElNUQ9…
 * Search form fields are renamed in the rendered HTML and get a signed hidden field, so search works without JavaScript
 * Unsigned `tx_solr` requests and suggest requests are redirected back or answered with `403`
 * No template changes, configured per site
+* Optional bot detection: a small script scores mouse, touch, scroll and key activity, and requests from headless or scripted clients are rejected
 
 > [!NOTE]
-> A behavioural bot-detection layer is in development ([#8](https://github.com/maikschneider/solr-shield/issues/8)). Its settings ship disabled; keep `solrShield.botDetection.enabled` off until it lands.
+> Bot detection is off by default. With `solrShield.botDetection.enabled`, visitors without JavaScript can no longer search.
 
 ## 🔥 Installation
 

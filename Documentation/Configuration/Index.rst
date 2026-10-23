@@ -52,10 +52,31 @@ Bot detection
     :type: bool
     :default: false
 
-    Leave this disabled for now. The client-side script that collects the
-    signals is not part of the extension yet, so enabling it rejects every
-    signed search request
-    (`#8 <https://github.com/maikschneider/solr-shield/issues/8>`__).
+    Include the bot-detection script and reject Solr requests whose
+    behavioural payload is missing or scores too low (see
+    :ref:`how-it-works-bot-detection`). Autocomplete requests are exempt.
 
-``solrShield.botDetection.minFormTimeout``, ``securityLevel`` and
-``requireInteraction`` only take effect together with bot detection.
+    ..  attention::
+        Visitors without JavaScript can no longer search or follow filter
+        links once this is enabled.
+
+..  confval:: solrShield.botDetection.minFormTimeout
+    :name: setting-botDetection-minFormTimeout
+    :type: int
+    :default: 3
+
+    Seconds between page load and a search. Faster requests fail one check.
+
+..  confval:: solrShield.botDetection.securityLevel
+    :name: setting-botDetection-securityLevel
+    :type: int
+    :default: 7
+
+    How many of the ten checks must pass. Values above 10 count as 10.
+
+..  confval:: solrShield.botDetection.requireInteraction
+    :name: setting-botDetection-requireInteraction
+    :type: bool
+    :default: true
+
+    When enabled, a request without any mouse or touch event fails one check.

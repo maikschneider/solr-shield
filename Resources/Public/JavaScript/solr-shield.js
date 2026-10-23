@@ -1,13 +1,11 @@
-/**
- * Solr Shield bot detection.
- *
- * Collects behavioural signals and sends them as `_solr_bot` with every Solr
- * request the visitor triggers: submitting a form that carries the signed
- * `_ss` field, or following a link whose URL carries `_ss`. The server scores
- * the payload (BotDetectionService) and rejects requests without one.
- *
- * Autocomplete requests are exempt on the server, so they need nothing here.
- */
+// Solr Shield bot detection.
+//
+// Collects behavioural signals and sends them as `_solr_bot` with every Solr
+// request the visitor triggers: submitting a form that carries the signed
+// `_ss` field, or following a link whose URL carries `_ss`. The server scores
+// the payload (BotDetectionService) and rejects requests without one.
+//
+// Autocomplete requests are exempt on the server, so they need nothing here.
 (() => {
   'use strict';
 
