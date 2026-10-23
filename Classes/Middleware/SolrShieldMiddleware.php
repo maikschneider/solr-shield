@@ -58,12 +58,10 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
                 if ($decoded === null) {
                     return $this->reject($request, $settings['uriObfuscation']['rejectAction']);
                 }
-                // For suggest: signature is all we need; no tx_solr params to inject.
-                // Always call injectDecodedParams for non-suggest so _ss is stripped
-                // even when decoded is empty (no-JS form path via _s[…] remapping).
-                if (!$isSuggestRequest) {
-                    $request = $this->injectDecodedParams($request, $decoded);
-                }
+                // Suggest requests carry the typed tx_solr[queryString] next to
+                // the signed additionalFilters, so the payload is merged into
+                // the request instead of replacing its tx_solr parameters.
+                $request = $this->injectDecodedParams($request, $decoded, $isSuggestRequest);
             } elseif ($hasTxSolr || $isSuggestRequest) {
                 // Direct tx_solr request or suggest without signed payload → reject
                 return $this->reject($request, $settings['uriObfuscation']['rejectAction']);
@@ -211,11 +209,13 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
     /**
      * @param array<array-key, mixed> $decodedParams
      */
-    private function injectDecodedParams(ServerRequestInterface $request, array $decodedParams): ServerRequestInterface
+    private function injectDecodedParams(ServerRequestInterface $request, array $decodedParams, bool $merge): ServerRequestInterface
     {
         $queryParams = $request->getQueryParams();
         unset($queryParams['_ss']);
-        $queryParams = array_merge($queryParams, $decodedParams);
+        $queryParams = $merge
+            ? array_replace_recursive($queryParams, $decodedParams)
+            : array_merge($queryParams, $decodedParams);
 
         $parsedBody = (array)($request->getParsedBody() ?? []);
         unset($parsedBody['_ss']);

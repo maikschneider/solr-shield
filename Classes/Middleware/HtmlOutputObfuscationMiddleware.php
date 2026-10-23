@@ -43,7 +43,7 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
         }
 
         $body = (string)$response->getBody();
-        $modified = $this->rewriteFieldNames($body);
+        $modified = $this->signSuggestUrls($this->rewriteFieldNames($body));
 
         if ($modified === $body) {
             return $response;
@@ -77,6 +77,32 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
             ['name="_s[', "name='_s["],
             $html
         );
+    }
+
+    /**
+     * Append a signed empty payload to EXT:solr's `data-suggest` URLs that
+     * carry none, so autocomplete requests pass SolrShieldMiddleware. URLs
+     * with `tx_solr[additionalFilters]` already got `_ss` from the link listener.
+     */
+    private function signSuggestUrls(string $html): string
+    {
+        $payload = $this->buildEmptySsPayload();
+
+        $result = preg_replace_callback(
+            '/(\sdata-suggest=)(["\'])(.*?)\2/si',
+            static function (array $matches) use ($payload): string {
+                $url = html_entity_decode($matches[3], ENT_QUOTES | ENT_HTML5);
+                parse_str((string)parse_url($url, PHP_URL_QUERY), $query);
+                if (isset($query['_ss'])) {
+                    return $matches[0];
+                }
+                $url .= (str_contains($url, '?') ? '&' : '?') . '_ss=' . rawurlencode($payload);
+                return $matches[1] . $matches[2] . htmlspecialchars($url, ENT_QUOTES) . $matches[2];
+            },
+            $html
+        );
+
+        return $result ?? $html;
     }
 
     /**

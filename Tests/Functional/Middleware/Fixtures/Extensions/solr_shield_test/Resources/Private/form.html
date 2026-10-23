@@ -1,10 +1,13 @@
 <!DOCTYPE html>
 <html>
 <body>
-<form id="search" action="/search" method="get">
+<form id="search" action="/search" method="get" data-suggest="/?type=7384&amp;L=0" data-suggest-header="Top Results">
     <input type="text" name="tx_solr[q]" value="">
     <input type="hidden" name='tx_solr[filter][0]' value="type:pages">
     <button type="submit">Search</button>
+</form>
+<form id="filtered" action="/search" method="get" data-suggest="/?type=7384&amp;_ss=FILTERS">
+    <input type="text" name="tx_solr[q]" value="">
 </form>
 <form id="newsletter" action="/newsletter" method="post">
     <input type="email" name="email">

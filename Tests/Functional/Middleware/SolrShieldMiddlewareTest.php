@@ -69,6 +69,16 @@ final class SolrShieldMiddlewareTest extends AbstractMiddlewareTestCase
         self::assertSame(200, $response->getStatusCode());
     }
 
+    #[Test]
+    public function signedSuggestRequestKeepsTypedQueryAndDecodesFilters(): void
+    {
+        $ss = $this->signedPayload('tx_solr%5BadditionalFilters%5D%5B0%5D=type%3Apages');
+
+        $query = $this->echoed($this->request('/?type=7384&tx_solr%5BqueryString%5D=fo&_ss=' . rawurlencode($ss)))['query'];
+
+        self::assertSame(['type' => '7384', 'tx_solr' => ['queryString' => 'fo', 'additionalFilters' => ['type:pages']]], $query);
+    }
+
     /**
      * @return array<string, array{string}>
      */
