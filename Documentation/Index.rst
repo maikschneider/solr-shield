@@ -58,6 +58,10 @@ thousands of unique, uncacheable search requests.
 
         The signed ``_ss`` parameter, the form rewrite and the middleware.
 
+    ..  card:: :ref:`Integration <integration>`
+
+        Custom templates, forms and JavaScript.
+
     ..  card:: :ref:`Known problems <known-problems>`
 
         Current limitations.
@@ -73,4 +77,5 @@ thousands of unique, uncacheable search requests.
     Installation/Index
     Configuration/Index
     HowItWorks/Index
+    Integration/Index
     KnownProblems/Index

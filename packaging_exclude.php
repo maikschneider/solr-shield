@@ -14,7 +14,7 @@ return [
         '.phpunit.cache',
         'bin',
         'build',
-        'config/',
+        'config\/',
         'Documentation-GENERATED-temp',
         'Plans',
         'public',

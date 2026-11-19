@@ -12,6 +12,7 @@ use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use TYPO3\CMS\Core\Http\RedirectResponse;
+use TYPO3\CMS\Core\Http\Uri;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
 /**
@@ -48,24 +49,26 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
         if ($settings['uriObfuscation']['enabled']) {
             $decodedRequest = $this->decodeSolrParameters($request, $isSuggestRequest);
             if ($decodedRequest === null) {
-                return $this->reject($request, $settings['uriObfuscation']['rejectAction']);
+                return $this->reject($request, $settings['uriObfuscation']['rejectAction'], $isSuggestRequest);
             }
             $request = $decodedRequest;
         }
 
         // --- Protection 2: Bot Detection ---
-        if ($settings['botDetection']['enabled'] && !$isSuggestRequest && $hasSs) {
+        if ($settings['botDetection']['enabled'] && $hasSs) {
             // A form posted to a URL that came from a signed link carries that
             // link's older payload in the query; the one in the body is fresh.
             $botPayload = $this->extractParam([], $parsedBody, '_solr_bot');
             if ($botPayload === '') {
                 $botPayload = $this->extractParam($queryParams, null, '_solr_bot');
             }
-            if ($botPayload === '') {
-                return $this->reject($request, $settings['uriObfuscation']['rejectAction']);
+            $botSettings = $settings['botDetection'];
+            if ($isSuggestRequest) {
+                // Visitors often start typing right after the page has loaded.
+                $botSettings['minFormTimeout'] = 0;
             }
-            if (!$this->botDetectionService->isHuman($botPayload, $settings['botDetection'])) {
-                return $this->reject($request, $settings['uriObfuscation']['rejectAction']);
+            if ($botPayload === '' || !$this->botDetectionService->isHuman($botPayload, $botSettings)) {
+                return $this->reject($request, $settings['uriObfuscation']['rejectAction'], $isSuggestRequest);
             }
             $request = $this->stripParams($request, ['_solr_bot']);
         }
@@ -90,7 +93,7 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
         return [
             'uriObfuscation' => [
                 'enabled' => (bool)($siteSettings?->get('solrShield.uriObfuscation.enabled', true) ?? true),
-                'rejectAction' => (string)($siteSettings?->get('solrShield.uriObfuscation.rejectAction', 'redirect') ?? 'redirect'),
+                'rejectAction' => (string)($siteSettings?->get('solrShield.uriObfuscation.rejectAction', '403') ?? '403'),
             ],
             'botDetection' => [
                 // Off by default: visitors without JavaScript cannot send a payload.
@@ -269,14 +272,46 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
         return is_string($value) ? $value : '';
     }
 
-    private function reject(ServerRequestInterface $request, string $action): ResponseInterface
+    /**
+     * Suggest requests come from a script that expects JSON, so they are never redirected.
+     */
+    private function reject(ServerRequestInterface $request, string $action, bool $isSuggestRequest): ResponseInterface
     {
-        if ($action === '403') {
+        if ($action === '403' || $isSuggestRequest) {
             return $this->responseFactory->createResponse(403);
         }
 
-        $referer = $request->getHeaderLine('Referer');
-        return new RedirectResponse($referer !== '' ? $referer : '/', 302);
+        return new RedirectResponse($this->redirectTarget($request), 302);
+    }
+
+    /**
+     * The referer, if it is on the same scheme, host and port as the request,
+     * otherwise the site root. The target is rebuilt from the request URI so
+     * that only the referer's path and query are taken over.
+     */
+    private function redirectTarget(ServerRequestInterface $request): string
+    {
+        $site = $request->getAttribute('site');
+        $fallback = $site instanceof Site ? (string)$site->getBase() : '/';
+
+        try {
+            $referer = new Uri($request->getHeaderLine('Referer'));
+        } catch (\InvalidArgumentException) {
+            return $fallback;
+        }
+        $uri = $request->getUri();
+        if ($referer->getScheme() !== $uri->getScheme()
+            || $referer->getHost() !== $uri->getHost()
+            || $referer->getPort() !== $uri->getPort()
+        ) {
+            return $fallback;
+        }
+
+        return (string)$uri
+            ->withUserInfo('')
+            ->withPath($referer->getPath() !== '' ? $referer->getPath() : '/')
+            ->withQuery($referer->getQuery())
+            ->withFragment('');
     }
 
     /**

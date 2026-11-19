@@ -17,7 +17,7 @@ final class PayloadIntegrityTest extends AbstractMiddlewareTestCase
     {
         $forged = $this->withQueryString($this->signedPayload('tx_solr%5Bq%5D=foo'), 'tx_solr%5Bfilter%5D%5B0%5D=type%3Anews');
 
-        $this->assertRedirectsTo('/', $this->request('/search?_ss=' . rawurlencode($forged)));
+        $this->assertForbidden($this->request('/search?_ss=' . rawurlencode($forged)));
     }
 
     #[Test]
@@ -25,7 +25,7 @@ final class PayloadIntegrityTest extends AbstractMiddlewareTestCase
     {
         $uri = '/search?_ss=' . rawurlencode($this->signedPayload('')) . '&tx_solr%5Bfilter%5D%5B0%5D=type%3Anews';
 
-        $this->assertRedirectsTo('/', $this->request($uri));
+        $this->assertForbidden($this->request($uri));
     }
 
     #[Test]
@@ -33,7 +33,7 @@ final class PayloadIntegrityTest extends AbstractMiddlewareTestCase
     {
         $uri = '/search?_s%5Bq%5D=foo&_s%5Bfilter%5D%5B1%5D=type%3Anews&_ss=' . rawurlencode($this->formSs('search'));
 
-        $this->assertRedirectsTo('/', $this->request($uri));
+        $this->assertForbidden($this->request($uri));
     }
 
     #[Test]
@@ -41,7 +41,7 @@ final class PayloadIntegrityTest extends AbstractMiddlewareTestCase
     {
         $uri = '/search?_s%5Bq%5D=foo&_s%5Bfilter%5D%5B0%5D=type%3Anews&_ss=' . rawurlencode($this->formSs('search'));
 
-        $this->assertRedirectsTo('/', $this->request($uri));
+        $this->assertForbidden($this->request($uri));
     }
 
     #[Test]
@@ -72,8 +72,8 @@ final class PayloadIntegrityTest extends AbstractMiddlewareTestCase
             ['tx_solr' => ['filter' => ['type:pages', 'author:jane', 'author:joe']]],
             $this->echoed($this->request('/search?_s%5Bfilter%5D%5B0%5D=type%3Apages&_s%5Bfilter%5D%5B1%5D=author%3Ajane&_s%5Bfilter%5D%5B2%5D=author%3Ajoe&_ss=' . $ss))['query']
         );
-        $this->assertRedirectsTo('/', $this->request('/search?_s%5Bfilter%5D%5B0%5D=type%3Anews&_ss=' . $ss));
-        $this->assertRedirectsTo('/', $this->request('/search?_s%5Bfilter%5D%5Bx%5D=type%3Anews&_ss=' . $ss));
+        $this->assertForbidden($this->request('/search?_s%5Bfilter%5D%5B0%5D=type%3Anews&_ss=' . $ss));
+        $this->assertForbidden($this->request('/search?_s%5Bfilter%5D%5Bx%5D=type%3Anews&_ss=' . $ss));
     }
 
     #[Test]
@@ -82,7 +82,7 @@ final class PayloadIntegrityTest extends AbstractMiddlewareTestCase
         $ss = rawurlencode($this->signedPayload(''));
 
         self::assertSame(200, $this->request('/?type=7384&tx_solr%5BqueryString%5D=fo&_ss=' . $ss)->getStatusCode());
-        $this->assertRedirectsTo('/', $this->request('/?type=7384&tx_solr%5BqueryString%5D=fo&tx_solr%5Bfilter%5D%5B0%5D=type%3Anews&_ss=' . $ss));
+        $this->assertForbidden($this->request('/?type=7384&tx_solr%5BqueryString%5D=fo&tx_solr%5Bfilter%5D%5B0%5D=type%3Anews&_ss=' . $ss));
     }
 
     private function withQueryString(string $ss, string $query): string

@@ -5,11 +5,23 @@
 // `_ss` field, or following a link whose URL carries `_ss`. The server scores
 // the payload (BotDetectionService) and rejects requests without one.
 //
-// Autocomplete requests are exempt on the server, so they need nothing here.
+// Autocomplete requests and AJAX requests to `_ss` URLs get the payload when
+// a script opens them, see signRequestUrl().
 (() => {
   'use strict';
 
-  const startTime = Date.now();
+  // Turbo Drive and similar libraries run body scripts again on every visit,
+  // while the document and its listeners stay. Set up once per document, and
+  // restart the clock on every visit as a page load would.
+  if (window.solrShieldRestart) {
+    window.solrShieldRestart();
+    return;
+  }
+
+  let startTime = Date.now();
+  window.solrShieldRestart = () => {
+    startTime = Date.now();
+  };
   const signals = {
     mouseMoveCount: 0,
     scrollCount: 0,
@@ -62,25 +74,79 @@
     nativeSubmit.call(this);
   };
 
-  // The href is rewritten at the last moment, right before the browser (or a
-  // script that loads the link via AJAX) reads it, so the payload is fresh.
-  const signLink = (event) => {
-    const link = event.target instanceof Element ? event.target.closest('a[href]') : null;
+  const searchUrl = (target) => {
+    const link = target instanceof Element ? target.closest('a[href]') : null;
     if (!link) {
-      return;
+      return null;
     }
     const url = new URL(link.href, window.location.href);
     if (url.origin !== window.location.origin || !url.searchParams.has('_ss')) {
-      return;
+      return null;
     }
     // A fragment link inherits the page's query; changing it would reload the search.
     if (url.hash && url.href.split('#')[0] === window.location.href.split('#')[0]) {
+      return null;
+    }
+    return { link, url };
+  };
+
+  // The href is rewritten at the last moment, right before the browser (or a
+  // script that loads the link via AJAX) reads it, so the payload is fresh.
+  const signLink = (event) => {
+    const search = searchUrl(event.target);
+    if (!search) {
       return;
     }
-    url.searchParams.set('_solr_bot', payload());
-    link.href = url.toString();
+    search.url.searchParams.set('_solr_bot', payload());
+    search.link.href = search.url.toString();
   };
   ['pointerdown', 'click', 'auxclick', 'contextmenu'].forEach((type) => {
     document.addEventListener(type, signLink, true);
   });
+
+  // Turbo prefetches links on hover, before any of the events above. The
+  // request would carry no payload or an outdated one, and the click fetches
+  // the freshly signed URL anyway.
+  document.addEventListener('turbo:before-prefetch', (event) => {
+    if (searchUrl(event.target)) {
+      event.preventDefault();
+    }
+  });
+
+  // Autocomplete scripts (EXT:solr's suggest controllers or custom ones) and
+  // scripts that load a signed URL via AJAX send their request without any of
+  // the events above. Their same-origin request URLs get a fresh payload.
+  const signRequestUrl = (input) => {
+    let url;
+    try {
+      url = new URL(String(input), document.baseURI);
+    } catch {
+      return null;
+    }
+    if (url.origin !== window.location.origin
+      || (url.searchParams.get('type') !== '7384' && !url.searchParams.has('_ss'))
+    ) {
+      return null;
+    }
+    url.searchParams.set('_solr_bot', payload());
+    return url.toString();
+  };
+
+  const nativeOpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function open(method, url, ...rest) {
+    nativeOpen.call(this, method, signRequestUrl(url) ?? url, ...rest);
+  };
+
+  const nativeFetch = window.fetch;
+  if (nativeFetch) {
+    window.fetch = (input, init) => {
+      const isRequest = input instanceof Request;
+      // A Request with a body cannot always be copied (keepalive), so it stays as it is.
+      const signed = isRequest && input.body !== null ? null : signRequestUrl(isRequest ? input.url : input);
+      if (signed) {
+        input = isRequest ? new Request(signed, input) : signed;
+      }
+      return nativeFetch.call(window, input, init);
+    };
+  }
 })();

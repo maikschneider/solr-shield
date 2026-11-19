@@ -73,7 +73,7 @@
 				"providesPackages": {}
 			},
 			"extension-key": "solr_shield",
-			"version": "0.1.0",
+			"version": "1.0.1",
 			"web-dir": "public"
 		}
 	},

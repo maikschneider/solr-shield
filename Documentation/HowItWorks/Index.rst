@@ -121,8 +121,9 @@ The middleware ``maikschneider/solr-shield`` runs after
           the only exception is ``tx_solr[queryString]`` on suggest requests
     *   - Invalid ``_ss``, or ``_s[…]`` fields its form did not sign
         - Rejected
-    *   - Suggest request without ``_ss``
-        - Rejected
+    *   - Suggest request (``type=7384``) without a valid ``_ss``, or with
+          other raw ``tx_solr`` parameters
+        - Rejected with an empty ``403``
     *   - No Solr parameters
         - Passed through
 
@@ -133,9 +134,14 @@ Bot detection
 
 With :confval:`setting-botDetection-enabled`, the site set includes
 ``EXT:solr_shield/Resources/Public/JavaScript/solr-shield.js`` in the page
-footer. The script counts mouse, touch, scroll and key events and, right
-before a Solr form is submitted or a link carrying ``_ss`` is followed, adds
-a base64-encoded JSON payload as ``_solr_bot``:
+footer. The script counts mouse, touch, scroll and key events and adds a
+base64-encoded JSON payload as ``_solr_bot`` right before the request
+leaves the browser:
+
+*   a form with the ``_ss`` field is submitted,
+*   a link carrying ``_ss`` is followed,
+*   a script opens a same-origin ``XMLHttpRequest`` or calls ``fetch()`` for
+    a URL with ``type=7384`` (autocomplete) or ``_ss``.
 
 ..  code-block:: json
 
@@ -148,13 +154,14 @@ a base64-encoded JSON payload as ``_solr_bot``:
         "ts": 1760000000000
     }
 
-The middleware scores every request that carries ``_ss``, except autocomplete
-requests, and removes ``_solr_bot`` before TYPO3 resolves the page:
+The middleware scores every request that carries ``_ss``, autocomplete
+requests included, and removes ``_solr_bot`` before TYPO3 resolves the page:
 
 *   Rejected outright: ``webdriver`` is set, or the screen is 800×600, the
     default of many headless browsers.
 *   Otherwise ten checks are counted: the two above, at least
-    :confval:`setting-botDetection-minFormTimeout` seconds since page load,
+    :confval:`setting-botDetection-minFormTimeout` seconds since page load
+    (always passed by autocomplete requests),
     mouse or touch activity (see
     :confval:`setting-botDetection-requireInteraction`), scrolling, key
     presses, a viewport width and height, less than an hour since page load,
@@ -162,4 +169,5 @@ requests, and removes ``_solr_bot`` before TYPO3 resolves the page:
     :confval:`setting-botDetection-securityLevel` of them must pass.
 
 A missing or failing payload is rejected like an unsigned request (see
-:confval:`setting-uriObfuscation-rejectAction`).
+:confval:`setting-uriObfuscation-rejectAction`). Autocomplete requests always
+get an empty ``403``.

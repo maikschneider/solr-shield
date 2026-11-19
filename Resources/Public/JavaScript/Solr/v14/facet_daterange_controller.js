@@ -28,7 +28,9 @@ function solrShieldNavigate(url) {
   link.remove();
 }
 
-class DateRangeFacetController {
+// Solr Shield: Turbo Drive and similar libraries run body scripts again on
+// every visit. `var` can be declared again where `class` and `const` throw.
+var DateRangeFacetController = class {
   constructor(element) {
     this.elements = element
     this.facetName = element.getAttribute('data-facet-name')
@@ -150,10 +152,10 @@ class DateRangeFacetController {
       }
     }
   }
-}
+};
 
-const dateRangeFacetControllers = [];
-const initDateRange = () => {
+var dateRangeFacetControllers = [];
+var initDateRange = () => {
   dateRangeFacetControllers.length = 0;
   const dateInputs  = document.querySelectorAll(".tx-solr-daterange")
   if (dateInputs.length) {
@@ -166,4 +168,8 @@ const initDateRange = () => {
 };
 
 initDateRange();
-document.body.addEventListener("tx_solr_updated", initDateRange);
+// Solr Shield: listen once, on the document, which outlives a Turbo visit.
+if (!window.solrShieldDateRangeListening) {
+  window.solrShieldDateRangeListening = true;
+  document.addEventListener("tx_solr_updated", initDateRange);
+}

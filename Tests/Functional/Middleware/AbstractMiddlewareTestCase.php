@@ -80,6 +80,12 @@ abstract class AbstractMiddlewareTestCase extends FunctionalTestCase
         return base64_encode((string)json_encode(['p' => $txSolrQuery, 's' => $signature]));
     }
 
+    protected function assertForbidden(ResponseInterface $response): void
+    {
+        self::assertSame(403, $response->getStatusCode(), (string)$response->getBody());
+        self::assertSame('', $response->getHeaderLine('Location'));
+    }
+
     protected function assertRedirectsTo(string $location, ResponseInterface $response): void
     {
         self::assertSame(302, $response->getStatusCode(), (string)$response->getBody());

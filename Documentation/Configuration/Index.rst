@@ -13,7 +13,7 @@ All settings are site settings. Edit them in
     solrShield:
       uriObfuscation:
         enabled: true
-        rejectAction: redirect
+        rejectAction: '403'
 
 ..  _configuration-uri-obfuscation:
 
@@ -32,15 +32,20 @@ URI obfuscation
 ..  confval:: solrShield.uriObfuscation.rejectAction
     :name: setting-uriObfuscation-rejectAction
     :type: string
-    :default: redirect
+    :default: 403
 
     What happens to a rejected request:
 
-    ``redirect``
-        ``302`` to the ``Referer`` of the request, or to ``/`` without one.
-
     ``403``
         An empty ``403 Forbidden`` response.
+
+    ``redirect``
+        ``302`` to the ``Referer`` of the request if it has the same scheme,
+        host and port, otherwise to the site root. Only the path and query of
+        the referer are kept.
+
+    Rejected autocomplete requests always get the empty ``403``: the
+    autocomplete script expects JSON and cannot follow a redirect to a page.
 
 ..  _configuration-bot-detection:
 
@@ -54,7 +59,7 @@ Bot detection
 
     Include the bot-detection script and reject Solr requests whose
     behavioural payload is missing or scores too low (see
-    :ref:`how-it-works-bot-detection`). Autocomplete requests are exempt.
+    :ref:`how-it-works-bot-detection`), autocomplete requests included.
 
     ..  attention::
         Visitors without JavaScript can no longer search or follow filter
@@ -66,6 +71,8 @@ Bot detection
     :default: 3
 
     Seconds between page load and a search. Faster requests fail one check.
+    Autocomplete requests skip this check, because visitors often start
+    typing right after the page has loaded.
 
 ..  confval:: solrShield.botDetection.securityLevel
     :name: setting-botDetection-securityLevel
