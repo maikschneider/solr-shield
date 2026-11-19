@@ -85,6 +85,27 @@ final class PayloadIntegrityTest extends AbstractMiddlewareTestCase
         $this->assertForbidden($this->request('/?type=7384&tx_solr%5BqueryString%5D=fo&tx_solr%5Bfilter%5D%5B0%5D=type%3Anews&_ss=' . $ss));
     }
 
+    #[Test]
+    public function rangeBoundsFillTheSignedTemplate(): void
+    {
+        $ss = rawurlencode($this->signedPayload('tx_solr%5Bfilter%5D%5B0%5D=uidRange%3A___FROM___-___TO___&tx_solr%5Bq%5D=foo'));
+
+        self::assertSame(
+            ['tx_solr' => ['filter' => ['uidRange:5-10.5'], 'q' => 'foo']],
+            $this->echoed($this->request('/search?_ss=' . $ss . '&_sr%5Bfrom%5D=5&_sr%5Bto%5D=10.5'))['query']
+        );
+    }
+
+    #[Test]
+    public function rangeBoundsAcceptOnlyNumbers(): void
+    {
+        $ss = rawurlencode($this->signedPayload('tx_solr%5Bfilter%5D%5B0%5D=uidRange%3A___FROM___-___TO___'));
+
+        $this->assertForbidden($this->request('/search?_ss=' . $ss . '&_sr%5Bfrom%5D=5&_sr%5Bto%5D=10%20OR%20type%3Anews'));
+        $this->assertForbidden($this->request('/search?_ss=' . $ss . '&_sr%5Bfrom%5D=5&_sr%5Bq%5D=10'));
+        $this->assertForbidden($this->request('/search?_ss=' . $ss . '&_sr=5'));
+    }
+
     private function withQueryString(string $ss, string $query): string
     {
         $data = json_decode((string)base64_decode($ss, true), true);

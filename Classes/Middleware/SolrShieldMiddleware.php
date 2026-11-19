@@ -141,7 +141,11 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
         if ($payload === null) {
             return null;
         }
-        unset($queryParams['_ss'], $parsedBody['_ss']);
+        $payload['params'] = $this->fillRangePlaceholders($payload['params'], $queryParams['_sr'] ?? null);
+        if ($payload['params'] === null) {
+            return null;
+        }
+        unset($queryParams['_ss'], $queryParams['_sr'], $parsedBody['_ss']);
 
         if ($isSuggestRequest) {
             $queryParams = array_replace_recursive($queryParams, $payload['params']);
@@ -170,6 +174,40 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
         return $request
             ->withQueryParams($queryParams)
             ->withParsedBody($parsedBody ?: null);
+    }
+
+    /**
+     * Range facets sign a URL template, so the browser cannot fill in the
+     * range without breaking the signature. It sends the range as
+     * `_sr[from]` and `_sr[to]` instead, which replace the `___FROM___` and
+     * `___TO___` placeholders of the signed parameters. Only numbers are
+     * accepted, so nothing but the range bounds can be changed.
+     *
+     * @param array<array-key, mixed> $params
+     * @return array<array-key, mixed>|null
+     */
+    private function fillRangePlaceholders(array $params, mixed $range): ?array
+    {
+        if ($range === null) {
+            return $params;
+        }
+        if (!is_array($range) || $range === [] || array_diff_key($range, ['from' => true, 'to' => true]) !== []) {
+            return null;
+        }
+        $replacements = [];
+        foreach ($range as $bound => $value) {
+            if (!is_string($value) || preg_match('/^-?\d+(?:\.\d+)?$/', $value) !== 1) {
+                return null;
+            }
+            $replacements['___' . strtoupper((string)$bound) . '___'] = $value;
+        }
+        array_walk_recursive($params, static function (mixed &$value) use ($replacements): void {
+            if (is_string($value)) {
+                $value = strtr($value, $replacements);
+            }
+        });
+
+        return $params;
     }
 
     /**

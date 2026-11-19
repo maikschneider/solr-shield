@@ -88,11 +88,13 @@ cannot find the placeholders, and the navigation bypasses ``solr-shield.js``.
 The middleware ``maikschneider/solr-shield-html`` therefore points every
 ``<script>`` tag that loads EXT:solr's copy of these files to patched copies
 in ``EXT:solr_shield/Resources/Public/JavaScript/Solr/``, one set for
-EXT:solr 13 and one for EXT:solr 14. The patched scripts fill the range into
-the ``_ss`` payload and follow the URL through a link click, which
-``solr-shield.js`` signs like any other link. It does not matter how the
-stock scripts are included, for example through EXT:solr's example site sets
-or your own TypoScript.
+EXT:solr 13 and one for EXT:solr 14. The patched scripts leave the signed
+``_ss`` untouched, send the range as ``_sr[from]`` and ``_sr[to]`` and follow
+the URL through a link click, so ``solr-shield.js`` adds ``_solr_bot`` like
+for any other link. The middleware ``maikschneider/solr-shield`` puts the two
+values into the placeholders after checking the signature; it accepts numbers
+only. It does not matter how the stock scripts are included, for example
+through EXT:solr's example site sets or your own TypoScript.
 
 ..  _how-it-works-middleware:
 
@@ -116,6 +118,9 @@ The middleware ``maikschneider/solr-shield`` runs after
           ``tx_solr[…]``
     *   - Suggest request (``type=7384``) with a valid ``_ss``
         - Payload merged with the typed ``tx_solr[queryString]``
+    *   - Valid ``_ss`` with ``_sr[from]`` and ``_sr[to]`` (range facets)
+        - Numeric bounds filled into the payload's ``___FROM___`` and
+          ``___TO___`` placeholders, anything else rejected
     *   - Raw ``tx_solr`` parameters, with or without ``_ss``
         - Rejected (see :confval:`setting-uriObfuscation-rejectAction`);
           the only exception is ``tx_solr[queryString]`` on suggest requests
