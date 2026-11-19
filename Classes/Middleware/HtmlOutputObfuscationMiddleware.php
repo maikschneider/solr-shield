@@ -187,25 +187,28 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
     {
         $fixed = [];
         $free = [];
+        // Every tag is consumed whole, so tag-like text inside an attribute
+        // value, a comment, a script or a style never counts as a control.
         preg_match_all(
-            '/<(input|select|textarea|button)\b((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>/i',
-            (string)preg_replace('/<!--.*?-->/s', '', $form),
+            '/<!--.*?-->|<(script|style)\b.*?<\/\1\s*>|<(input|select|textarea|button)\b((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>|<[a-z](?:[^>"\']|"[^"]*"|\'[^\']*\')*>/is',
+            $form,
             $tags,
-            PREG_SET_ORDER
+            PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL
         );
-        foreach ($tags as [, $element, $attributeString]) {
+        foreach ($tags as $tag) {
+            if ($tag[2] === null) {
+                continue;
+            }
             // Unparsable controls are neither signed nor free, so their submission is rejected.
-            $attributes = $this->parseAttributes($attributeString);
+            $attributes = $this->parseAttributes((string)$tag[3]);
             $name = $attributes['name'] ?? '';
-            if (!str_starts_with($name, '_s[')) {
+            // The browser does not submit a disabled field.
+            if (!str_starts_with($name, '_s[') || isset($attributes['disabled'])) {
                 continue;
             }
             $path = substr($name, 2);
-            if (strtolower($element) === 'input' && strtolower($attributes['type'] ?? '') === 'hidden') {
-                // The browser does not submit a disabled field, so its value must not be restored.
-                if (!isset($attributes['disabled'])) {
-                    $fixed[] = [$path, $attributes['value'] ?? ''];
-                }
+            if (strtolower($tag[2]) === 'input' && strtolower($attributes['type'] ?? '') === 'hidden') {
+                $fixed[] = [$path, $attributes['value'] ?? ''];
             } else {
                 $free[$path] = $path;
             }
