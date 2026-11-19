@@ -72,6 +72,8 @@ numeric index. Hidden values of such a name are pinned to their position, so
 render them before the visible fields of the same name. A hidden field without
 ``[]`` that shares its name with a visible field, like the fallback Fluid
 renders before a checkbox, is not pinned: the visible field may replace it.
+Fields outside the ``<form>`` element, linked through the ``form``
+attribute, are not signed, so a submission that contains them is rejected.
 
 The ``data-suggest`` URL that EXT:solr's autocomplete reads gets a signed
 ``_ss`` as well, unless it already carries one.

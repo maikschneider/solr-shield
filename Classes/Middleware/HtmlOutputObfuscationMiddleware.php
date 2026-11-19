@@ -189,7 +189,7 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
         $free = [];
         preg_match_all(
             '/<(input|select|textarea|button)\b((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>/i',
-            $form,
+            (string)preg_replace('/<!--.*?-->/s', '', $form),
             $tags,
             PREG_SET_ORDER
         );
