@@ -110,6 +110,18 @@ final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCa
         self::assertStringContainsString('<input type="text" name="_s[q]"><input type="hidden" name="_ss" value="', $html);
     }
 
+    #[Test]
+    public function tagHeavyPageIsSignedWithLittleMemory(): void
+    {
+        memory_reset_peak_usage();
+        $before = memory_get_usage();
+
+        $html = (string)$this->request('/many-tags')->getBody();
+
+        self::assertStringContainsString('<input type="text" name="_s[q]"><input type="hidden" name="_ss" value="', $html);
+        self::assertLessThan(32 * 1024 * 1024, memory_get_peak_usage() - $before);
+    }
+
     /**
      * @return array<string, array{string, array<string, mixed>}>
      */

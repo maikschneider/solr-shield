@@ -229,20 +229,13 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
         // value, a comment, a script, a style or a textarea never counts as a tag.
         // A tag name ends at whitespace, `/` or `>`, so `<textarea-wrapper>` is no textarea.
         // Possessive loops keep large inline content within PCRE's backtrack limit.
+        // Tags are matched one at a time, so a tag-heavy page needs little memory.
         $attributePattern = '((?:[^>"\']++|"[^"]*+"|\'[^\']*+\')*+)';
-        $found = preg_match_all(
-            '/<!--[^-]*+(?:-(?!->)[^-]*+)*+-->'
+        $tagPattern = '/<!--[^-]*+(?:-(?!->)[^-]*+)*+-->'
             . '|<(script|style)(?=[\t\n\f\r \/>])[^<]*+(?:<(?!\/\1\s*>)[^<]*+)*+<\/\1\s*>'
             . '|(?|<(textarea)(?=[\t\n\f\r \/>])' . $attributePattern . '>[^<]*+(?:<(?!\/textarea\s*>)[^<]*+)*+<\/textarea\s*>'
             . '|<([a-z][^\t\n\f\r \/>]*+)' . $attributePattern . '>)'
-            . '|<\/([a-z][^\t\n\f\r \/>]*+)[^>]*+>/is',
-            $html,
-            $tags,
-            PREG_SET_ORDER | PREG_OFFSET_CAPTURE | PREG_UNMATCHED_AS_NULL
-        );
-        if ($found === false) {
-            throw new \RuntimeException('Could not find the forms to sign: ' . preg_last_error_msg(), 1795110108);
-        }
+            . '|<\/([a-z][^\t\n\f\r \/>]*+)[^>]*+>/is';
         $forms = [];
         $controls = [];
         $openForm = null;
@@ -252,7 +245,9 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
         // child, which it does not disable, is not yet seen (0), open (1) or
         // closed (2), and the elements open inside it until that legend is seen.
         $fieldsets = [];
-        foreach ($tags as $tag) {
+        $offset = 0;
+        while (($found = preg_match($tagPattern, $html, $tag, PREG_OFFSET_CAPTURE | PREG_UNMATCHED_AS_NULL, $offset)) === 1) {
+            $offset = $tag[0][1] + strlen((string)$tag[0][0]);
             // Start tags by name, end tags as `/name`.
             $tagName = strtolower($tag[2][0] ?? (isset($tag[4][0]) ? '/' . $tag[4][0] : ''));
             if ($tagName === 'template' || $tagName === '/template') {
@@ -302,6 +297,9 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
                         $controls[] = [$openForm, $tagName, $attributes, $tag[0][1]];
                     }
             }
+        }
+        if ($found === false) {
+            throw new \RuntimeException('Could not find the forms to sign: ' . preg_last_error_msg(), 1795110108);
         }
 
         return [$forms, $controls];

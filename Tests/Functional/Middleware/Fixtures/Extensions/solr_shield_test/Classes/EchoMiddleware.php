@@ -13,9 +13,9 @@ use TYPO3\CMS\Core\Http\JsonResponse;
 
 /**
  * Stands in for the page: `/form` renders search markup, `/large-form` a
- * search form after large inline content, `/page` is rendered by TYPO3,
- * every other path echoes the parameters that made it past the Solr Shield
- * middleware.
+ * search form after large inline content, `/many-tags` one after many
+ * unrelated tags, `/page` is rendered by TYPO3, every other path echoes the
+ * parameters that made it past the Solr Shield middleware.
  */
 final class EchoMiddleware implements MiddlewareInterface
 {
@@ -34,6 +34,12 @@ final class EchoMiddleware implements MiddlewareInterface
                 '<!--' . $large . '--><script>' . $large . '</script><style>' . $large . '</style>'
                 . '<div data-note=' . $large . '></div><textarea>' . $large . '</textarea>'
                 . '<form id="large" action="/search"><input type="text" name="tx_solr[q]"></form>'
+            );
+        }
+        if ($request->getUri()->getPath() === '/many-tags') {
+            return new HtmlResponse(
+                str_repeat('<div class="row"><span>some content</span></div>', 40_000)
+                . '<form id="many-tags" action="/search"><input type="text" name="tx_solr[q]"></form>'
             );
         }
 
