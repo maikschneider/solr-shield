@@ -134,6 +134,24 @@ final class PayloadIntegrityTest extends AbstractMiddlewareTestCase
     }
 
     #[Test]
+    public function fieldsInsideATemplateCannotUnlockAHiddenValue(): void
+    {
+        $ss = rawurlencode($this->formSs('templated'));
+
+        self::assertSame(['tx_solr' => ['filter' => 'type:news']], $this->echoed($this->request('/search?_s%5Bfilter%5D=type%3Anews&_ss=' . $ss))['query']);
+        $this->assertForbidden($this->request('/search?_s%5Bfilter%5D=type%3Apages&_ss=' . $ss));
+        $this->assertForbidden($this->request('/search?_s%5Bfilter%5D=type%3Anews&_s%5Bq%5D=foo&_ss=' . $ss));
+    }
+
+    #[Test]
+    public function fieldsInADisabledFieldsetAreNotRestored(): void
+    {
+        $uri = '/search?_s%5Bq%5D=foo&_ss=' . rawurlencode($this->formSs('fieldset'));
+
+        self::assertSame(['tx_solr' => ['q' => 'foo', 'filter' => ['type:pages', 'year:2026']]], $this->echoed($this->request($uri))['query']);
+    }
+
+    #[Test]
     public function suggestAcceptsOnlyTheTypedQueryAsRawParameter(): void
     {
         $ss = rawurlencode($this->signedPayload(''));

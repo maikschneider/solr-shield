@@ -25,7 +25,7 @@ final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCa
     {
         $html = (string)$this->request('/form')->getBody();
 
-        self::assertSame(9, substr_count($html, 'name="_ss"'));
+        self::assertSame(14, substr_count($html, 'name="_ss"'));
         self::assertMatchesRegularExpression('#<form id="search".*name="_ss".*</form>#s', explode('<form id="newsletter"', $html)[0]);
     }
 
@@ -34,7 +34,7 @@ final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCa
     {
         self::assertSame(
             ['params' => ['tx_solr' => ['filter' => ['type:pages']]], 'freeFields' => ['[q]']],
-            $this->get(TokenService::class)->decode($this->injectedSs())
+            $this->get(TokenService::class)->decode($this->formSs('search'))
         );
     }
 
@@ -46,7 +46,7 @@ final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCa
                 'params' => ['tx_solr' => ['filter' => ['type:pages', 'author:jane', 'year:2026', 'lang:en']]],
                 'freeFields' => ['[q]'],
             ],
-            $this->get(TokenService::class)->decode($this->injectedSs('markup'))
+            $this->get(TokenService::class)->decode($this->formSs('markup'))
         );
     }
 
@@ -55,7 +55,38 @@ final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCa
     {
         self::assertSame(
             ['params' => ['tx_solr' => ['filter' => ['type:pages']]], 'freeFields' => ['[q]']],
-            $this->get(TokenService::class)->decode($this->injectedSs('custom-elements'))
+            $this->get(TokenService::class)->decode($this->formSs('custom-elements'))
+        );
+    }
+
+    #[Test]
+    public function formInsideACustomElementOwnsItsLinkedFields(): void
+    {
+        self::assertSame(
+            ['params' => [], 'freeFields' => ['[q]']],
+            $this->get(TokenService::class)->decode($this->formSs('wrapped'))
+        );
+    }
+
+    #[Test]
+    public function formWithAGreaterThanSignInAQuotedAttributeOwnsItsLinkedFields(): void
+    {
+        self::assertSame(
+            ['params' => [], 'freeFields' => ['[q]']],
+            $this->get(TokenService::class)->decode($this->formSs('quoted'))
+        );
+    }
+
+    #[Test]
+    public function formMarkupInACommentOrScriptOwnsNoFields(): void
+    {
+        $html = (string)$this->request('/form')->getBody();
+
+        self::assertStringContainsString('<!-- <form id="commented"></form> -->', $html);
+        self::assertStringContainsString('<script>const note = \'<form id="commented"></form>\';</script>', $html);
+        self::assertSame(
+            ['params' => [], 'freeFields' => ['[q]']],
+            $this->get(TokenService::class)->decode($this->formSs('commented'))
         );
     }
 
@@ -77,7 +108,7 @@ final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCa
     #[DataProvider('fallbackSubmissions')]
     public function checkboxCanReplaceItsHiddenFallbackValue(string $value, array $expected): void
     {
-        $uri = '/search?_s%5Bfilter%5D%5B0%5D=' . rawurlencode($value) . '&_ss=' . rawurlencode($this->injectedSs('fallback'));
+        $uri = '/search?_s%5Bfilter%5D%5B0%5D=' . rawurlencode($value) . '&_ss=' . rawurlencode($this->formSs('fallback'));
 
         self::assertSame($expected, $this->echoed($this->request($uri))['query']);
     }
@@ -93,7 +124,7 @@ final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCa
     #[Test]
     public function submittingTheRewrittenFormReachesThePageAsTxSolr(): void
     {
-        $uri = '/search?_s%5Bq%5D=foo&_s%5Bfilter%5D%5B0%5D=type%3Apages&_ss=' . rawurlencode($this->injectedSs());
+        $uri = '/search?_s%5Bq%5D=foo&_s%5Bfilter%5D%5B0%5D=type%3Apages&_ss=' . rawurlencode($this->formSs('search'));
 
         $query = $this->echoed($this->request($uri))['query'];
 
@@ -139,16 +170,6 @@ final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCa
     {
         $html = (string)$this->request('/form')->getBody();
         preg_match('/<form id="' . $formId . '"[^>]*\sdata-suggest="([^"]+)"/', $html, $matches);
-        $value = $matches[1] ?? '';
-        self::assertNotSame('', $value, $html);
-
-        return html_entity_decode($value, ENT_QUOTES);
-    }
-
-    private function injectedSs(string $formId = 'search'): string
-    {
-        $html = (string)$this->request('/form')->getBody();
-        preg_match('#<form id="' . $formId . '".*?name="_ss" value="([^"]+)"#s', $html, $matches);
         $value = $matches[1] ?? '';
         self::assertNotSame('', $value, $html);
 

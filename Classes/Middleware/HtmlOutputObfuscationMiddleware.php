@@ -168,13 +168,10 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
      */
     private function injectSsTokenIntoForms(string $html): string
     {
-        if (preg_match_all('/<form\b([^>]*)>.*?<\/form>/si', $html, $forms, PREG_SET_ORDER | PREG_OFFSET_CAPTURE) === 0) {
-            return $html;
-        }
+        [$forms, $controls] = $this->findFormsAndControls($html);
 
         $formIndexById = [];
-        foreach ($forms as $index => $form) {
-            $id = $this->parseAttributes($form[1][0])['id'] ?? '';
+        foreach ($forms as $index => [$id]) {
             if ($id !== '') {
                 $formIndexById[$id] ??= $index;
             }
@@ -183,62 +180,118 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
         // Like the browser, a control with a `form` attribute belongs to the
         // form with that id, or to no form if there is none, wherever it sits.
         $controlsByForm = [];
-        $formIndex = 0;
-        foreach ($this->findControls($html) as [$offset, $tagName, $attributes]) {
-            if (isset($attributes['form'])) {
-                $owner = $formIndexById[$attributes['form']] ?? null;
-            } else {
-                while (isset($forms[$formIndex]) && $forms[$formIndex][0][1] + strlen($forms[$formIndex][0][0]) <= $offset) {
-                    $formIndex++;
-                }
-                $owner = isset($forms[$formIndex]) && $forms[$formIndex][0][1] < $offset ? $formIndex : null;
-            }
-            if ($owner !== null) {
+        foreach ($controls as [$parentForm, $tagName, $attributes]) {
+            $owner = isset($attributes['form']) ? $formIndexById[$attributes['form']] ?? null : $parentForm;
+            if ($owner !== null && $forms[$owner][1] !== null) {
                 $controlsByForm[$owner][] = [$tagName, $attributes];
             }
         }
 
         // Insert from the last form backwards, so the offsets of earlier forms stay valid.
         krsort($controlsByForm);
-        foreach ($controlsByForm as $index => $controls) {
-            [$form, $offset] = $forms[$index][0];
-            $hiddenField = '<input type="hidden" name="_ss" value="' . htmlspecialchars($this->signForm($controls), ENT_QUOTES) . '">';
-            $html = substr_replace($html, $hiddenField, $offset + (int)strripos($form, '</form>'), 0);
+        foreach ($controlsByForm as $index => $formControls) {
+            $hiddenField = '<input type="hidden" name="_ss" value="' . htmlspecialchars($this->signForm($formControls), ENT_QUOTES) . '">';
+            $html = substr_replace($html, $hiddenField, (int)$forms[$index][1], 0);
         }
 
         return $html;
     }
 
     /**
-     * All enabled `_s[…]` controls of the document, in document order.
+     * All forms and enabled `_s[…]` controls of the document, in document order.
      *
-     * @return list<array{int, string, array<string, string>}> offset, lowercase tag name and attributes
+     * @return array{list<array{string, ?int}>, list<array{?int, string, array<string, string>}>}
+     *     forms with id and offset of their end tag (null if unclosed), and
+     *     controls with their enclosing form, lowercase tag name and attributes
      */
-    private function findControls(string $html): array
+    private function findFormsAndControls(string $html): array
     {
         // Every tag is consumed whole, so tag-like text inside an attribute
-        // value, a comment, a script, a style or a textarea never counts as a control.
+        // value, a comment, a script, a style or a textarea never counts as a tag.
         // A tag name ends at whitespace, `/` or `>`, so `<textarea-wrapper>` is no textarea.
         preg_match_all(
-            '/<!--.*?-->|<(script|style)(?=[\t\n\f\r \/>]).*?<\/\1\s*>|(?|<(textarea)(?=[\t\n\f\r \/>])((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>.*?<\/textarea\s*>|<(input|select|button)(?=[\t\n\f\r \/>])((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>)|<[a-z](?:[^>"\']|"[^"]*"|\'[^\']*\')*>/is',
+            '/<!--.*?-->|<(script|style)(?=[\t\n\f\r \/>]).*?<\/\1\s*>|(?|<(textarea)(?=[\t\n\f\r \/>])((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>.*?<\/textarea\s*>|<([a-z][^\t\n\f\r \/>]*)((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>)|<\/([a-z][^\t\n\f\r \/>]*)[^>]*>/is',
             $html,
             $tags,
             PREG_SET_ORDER | PREG_OFFSET_CAPTURE | PREG_UNMATCHED_AS_NULL
         );
+        $forms = [];
         $controls = [];
+        $openForm = null;
+        // The content of a template is no part of the document.
+        $templateDepth = 0;
+        // Per open fieldset: whether it is disabled, and whether its first
+        // legend, which it does not disable, is not yet seen (0), open (1) or closed (2).
+        $fieldsets = [];
         foreach ($tags as $tag) {
-            if ($tag[2][0] === null) {
+            // Start tags by name, end tags as `/name`.
+            $tagName = strtolower($tag[2][0] ?? (isset($tag[4][0]) ? '/' . $tag[4][0] : ''));
+            if ($tagName === 'template' || $tagName === '/template') {
+                $templateDepth = max(0, $templateDepth + ($tagName === 'template' ? 1 : -1));
                 continue;
             }
-            // Unparsable controls are neither signed nor free, so their submission is rejected.
-            $attributes = $this->parseAttributes((string)$tag[3][0]);
-            // The browser does not submit a disabled field.
-            if (str_starts_with($attributes['name'] ?? '', '_s[') && !isset($attributes['disabled'])) {
-                $controls[] = [$tag[0][1], strtolower($tag[2][0]), $attributes];
+            if ($templateDepth > 0) {
+                continue;
+            }
+            $innermostFieldset = array_key_last($fieldsets);
+            switch ($tagName) {
+                case 'form':
+                    // Like the browser, ignore a form inside a form.
+                    if ($openForm === null) {
+                        $forms[] = [$this->parseAttributes((string)$tag[3][0])['id'] ?? '', null];
+                        $openForm = array_key_last($forms);
+                    }
+                    break;
+                case '/form':
+                    if ($openForm !== null) {
+                        $forms[$openForm] = [$forms[$openForm][0], $tag[0][1]];
+                        $openForm = null;
+                    }
+                    break;
+                case 'fieldset':
+                    $fieldsets[] = [isset($this->parseAttributes((string)$tag[3][0])['disabled']), 0];
+                    break;
+                case '/fieldset':
+                    array_pop($fieldsets);
+                    break;
+                case 'legend':
+                    if ($innermostFieldset !== null && $fieldsets[$innermostFieldset][1] === 0) {
+                        $fieldsets[$innermostFieldset][1] = 1;
+                    }
+                    break;
+                case '/legend':
+                    if ($innermostFieldset !== null && $fieldsets[$innermostFieldset][1] === 1) {
+                        $fieldsets[$innermostFieldset][1] = 2;
+                    }
+                    break;
+                case 'input':
+                case 'select':
+                case 'button':
+                case 'textarea':
+                    // Unparsable controls are neither signed nor free, so their submission is rejected.
+                    $attributes = $this->parseAttributes((string)$tag[3][0]);
+                    // The browser does not submit a disabled field.
+                    if (str_starts_with($attributes['name'] ?? '', '_s[') && !isset($attributes['disabled']) && !$this->isDisabledByFieldset($fieldsets)) {
+                        $controls[] = [$openForm, $tagName, $attributes];
+                    }
             }
         }
 
-        return $controls;
+        return [$forms, $controls];
+    }
+
+    /**
+     * @param list<array{bool, int}> $fieldsets
+     */
+    private function isDisabledByFieldset(array $fieldsets): bool
+    {
+        foreach ($fieldsets as [$disabled, $legend]) {
+            if ($disabled && $legend !== 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -69,5 +69,31 @@
 </form>
 <input type="hidden" name="tx_solr[filter][]" value="year:2026" form="ordered">
 <select name="tx_solr[filter][]" form="ordered"><option value="author:jane">Jane</option></select>
+<form-wrapper>
+    <form id="wrapped" action="/search" method="get"></form>
+</form-wrapper>
+<input type="text" name="tx_solr[q]" value="" form="wrapped">
+<form id="quoted" action="/search" method="get" data-note="a>b"></form>
+<input type="text" name="tx_solr[q]" value="" form="quoted">
+<!-- <form id="commented"></form> -->
+<script>const note = '<form id="commented"></form>';</script>
+<form id="commented" action="/search" method="get"></form>
+<input type="text" name="tx_solr[q]" value="" form="commented">
+<form id="templated" action="/search" method="get">
+    <input type="hidden" name="tx_solr[filter]" value="type:news">
+    <template><input type="text" name="tx_solr[q]" value=""></template>
+</form>
+<template><template></template><input type="text" name="tx_solr[filter]" value="" form="templated"></template>
+<template><form id="templated"></form></template>
+<form id="fieldset" action="/search" method="get">
+    <input type="text" name="tx_solr[q]" value="">
+</form>
+<fieldset disabled>
+    <legend><input type="hidden" name="tx_solr[filter][]" value="type:pages" form="fieldset"></legend>
+    <fieldset><input type="hidden" name="tx_solr[filter][]" value="type:news" form="fieldset"></fieldset>
+    <legend><input type="hidden" name="tx_solr[filter][]" value="lang:en" form="fieldset"></legend>
+    <input type="hidden" name="tx_solr[filter][]" value="author:jane" form="fieldset">
+</fieldset>
+<input type="hidden" name="tx_solr[filter][]" value="year:2026" form="fieldset">
 </body>
 </html>

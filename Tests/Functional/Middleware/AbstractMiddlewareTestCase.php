@@ -81,7 +81,7 @@ abstract class AbstractMiddlewareTestCase extends FunctionalTestCase
     protected function formSs(string $formId): string
     {
         $html = (string)$this->request('/form')->getBody();
-        preg_match('#<form id="' . $formId . '".*?name="_ss" value="([^"]+)"#s', $html, $matches);
+        preg_match('#<form id="' . $formId . '" action=(?:(?!</form>).)*name="_ss" value="([^"]+)"#s', $html, $matches);
         $value = $matches[1] ?? '';
         self::assertNotSame('', $value, $html);
 

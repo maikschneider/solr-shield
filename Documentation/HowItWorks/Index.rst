@@ -74,7 +74,9 @@ hidden field without ``[]`` that shares its name with a visible field, like
 the fallback Fluid renders before a checkbox, is not pinned: the visible field
 may replace it. Like in the browser, a field with a ``form`` attribute belongs
 to the form with that ``id``, also outside the ``<form>`` element, and to no
-form if there is none.
+form if there is none. Fields the browser does not submit, because they are
+disabled, sit in a disabled ``<fieldset>`` or in a ``<template>``, are not
+signed.
 
 The ``data-suggest`` URL that EXT:solr's autocomplete reads gets a signed
 ``_ss`` as well, unless it already carries one.
