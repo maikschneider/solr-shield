@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Turbo Drive and similar SPA navigation.** `solr-shield.js` sets itself up once per document instead of on every visit, Turbo's hover prefetch is cancelled for `_ss` links, and the patched TYPO3 14 range facet scripts work on pages reached through a visit ([#21](https://github.com/maikschneider/solr-shield/issues/21)).
 
+### Security
+
+- **`_ss` signatures cover the payload.** The signature used to be the same constant for every link, so any visitor could copy it from a search page and sign arbitrary filter combinations. It is now an HMAC over the signed `tx_solr` parameters. Each search form gets its own `_ss` that pins its hidden values and lists its free fields; raw `tx_solr` parameters next to a valid `_ss` are rejected, except `tx_solr[queryString]` on autocomplete requests. Range facets send their bounds as `_sr[from]` and `_sr[to]` next to the signed URL template; only numbers are accepted ([#6](https://github.com/maikschneider/solr-shield/issues/6)).
+  **Breaking:** links signed by 1.0.1 are rejected (`403`, or the redirect set by `rejectAction`). This includes links that crawlers and search engines indexed before the update. There is no migration window.
+
 ## [1.0.1] - 2026-10-23
 
 ### Added

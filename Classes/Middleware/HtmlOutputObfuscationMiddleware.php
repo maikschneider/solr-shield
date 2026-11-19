@@ -21,7 +21,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  *
  * Every `name="tx_solr[` attribute is replaced with `name="_s[`.
  * Forms that contain such renamed inputs receive an injected hidden `_ss`
- * field carrying a server-signed token so that SolrShieldMiddleware can
+ * field signed for exactly that form, so that SolrShieldMiddleware can
  * validate and remap the submitted `_s[…]` parameters back to `tx_solr[…]`
  * without requiring JavaScript.
  *
@@ -95,7 +95,7 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
      */
     private function signSuggestUrls(string $html): string
     {
-        $payload = $this->buildEmptySsPayload();
+        $payload = $this->tokenService->encode('');
 
         $result = preg_replace_callback(
             '/(\sdata-suggest=)(["\'])(.*?)\2/si',
@@ -160,22 +160,22 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
     }
 
     /**
-     * Inject a hidden `_ss` token field into every form that carries `_s[`
-     * inputs so that SolrShieldMiddleware can validate the submission without JS.
+     * Inject a hidden `_ss` field into every form that carries `_s[` fields.
+     * Its payload signs the values of the form's hidden `_s[…]` fields and the
+     * names of the fields the visitor fills in, so a submission can neither
+     * change a hidden value nor add a field the form does not have.
      */
     private function injectSsTokenIntoForms(string $html): string
     {
-        $payload = $this->buildEmptySsPayload();
-        $hiddenField = '<input type="hidden" name="_ss" value="' . htmlspecialchars($payload, ENT_QUOTES) . '">';
-
         $result = preg_replace_callback(
             '/<form\b[^>]*>.*?<\/form>/si',
-            static function (array $matches) use ($hiddenField): string {
+            function (array $matches): string {
                 $form = $matches[0];
                 if (!str_contains($form, 'name="_s[') && !str_contains($form, "name='_s[")) {
                     return $form;
                 }
-                return str_replace('</form>', $hiddenField . '</form>', $form);
+                $hiddenField = '<input type="hidden" name="_ss" value="' . htmlspecialchars($this->signForm($form), ENT_QUOTES) . '">';
+                return substr_replace($form, $hiddenField, (int)strripos($form, '</form>'), 0);
             },
             $html
         );
@@ -183,15 +183,70 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
         return $result ?? $html;
     }
 
-    /**
-     * Build a signed empty-payload `_ss` value (token-only, no tx_solr params).
-     * SolrShieldMiddleware treats this as a valid proof-of-origin that decodes to [].
-     */
-    private function buildEmptySsPayload(): string
+    private function signForm(string $form): string
     {
-        return base64_encode((string)json_encode([
-            'p' => '',
-            's' => $this->tokenService->generateToken(),
-        ]));
+        $fixed = [];
+        $free = [];
+        // Every tag is consumed whole, so tag-like text inside an attribute
+        // value, a comment, a script, a style or a textarea never counts as a control.
+        // A tag name ends at whitespace, `/` or `>`, so `<textarea-wrapper>` is no textarea.
+        preg_match_all(
+            '/<!--.*?-->|<(script|style)(?=[\t\n\f\r \/>]).*?<\/\1\s*>|(?|<(textarea)(?=[\t\n\f\r \/>])((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>.*?<\/textarea\s*>|<(input|select|button)(?=[\t\n\f\r \/>])((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>)|<[a-z](?:[^>"\']|"[^"]*"|\'[^\']*\')*>/is',
+            $form,
+            $tags,
+            PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL
+        );
+        foreach ($tags as $tag) {
+            if ($tag[2] === null) {
+                continue;
+            }
+            // Unparsable controls are neither signed nor free, so their submission is rejected.
+            $attributes = $this->parseAttributes((string)$tag[3]);
+            $name = $attributes['name'] ?? '';
+            // The browser does not submit a disabled field.
+            if (!str_starts_with($name, '_s[') || isset($attributes['disabled'])) {
+                continue;
+            }
+            $path = substr($name, 2);
+            if (strtolower($tag[2]) === 'input' && strtolower($attributes['type'] ?? '') === 'hidden') {
+                $fixed[] = [$path, $attributes['value'] ?? ''];
+            } else {
+                $free[$path] = $path;
+            }
+        }
+
+        $query = [];
+        foreach ($fixed as [$path, $value]) {
+            // A name without `[]` carries one value, so an editable control with
+            // the same name (e.g. a checkbox after its hidden fallback) replaces it.
+            if (isset($free[$path]) && !str_ends_with($path, '[]')) {
+                continue;
+            }
+            $query[] = rawurlencode('tx_solr' . $path) . '=' . rawurlencode($value);
+        }
+
+        return $this->tokenService->encode(implode('&', $query), array_values($free));
+    }
+
+    /**
+     * Tokenize attributes left to right like the browser does, so text inside a
+     * quoted value never counts as another attribute.
+     *
+     * @return array<string, string> lowercase names, the first occurrence wins; empty if unparsable
+     */
+    private function parseAttributes(string $attributeString): array
+    {
+        $attributes = [];
+        $offset = 0;
+        $pattern = '/\G[\s\/]*([^\s"\'>\/=]+)(?:\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'=<>`]+)))?/';
+        while (preg_match($pattern, $attributeString, $matches, PREG_UNMATCHED_AS_NULL, $offset) === 1) {
+            $offset += strlen((string)$matches[0]);
+            $attributes[strtolower((string)$matches[1])] ??= html_entity_decode(
+                $matches[2] ?? $matches[3] ?? $matches[4] ?? '',
+                ENT_QUOTES | ENT_HTML5
+            );
+        }
+
+        return preg_match('/^[\s\/]*$/', substr($attributeString, $offset)) === 1 ? $attributes : [];
     }
 }

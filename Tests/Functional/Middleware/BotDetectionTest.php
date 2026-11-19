@@ -70,7 +70,7 @@ final class BotDetectionTest extends AbstractMiddlewareTestCase
     {
         $echoed = $this->echoed($this->request('/search', [
             '_s' => ['q' => 'foo'],
-            '_ss' => $this->signedPayload(''),
+            '_ss' => $this->signedPayload('', ['[q]']),
             '_solr_bot' => self::botPayload(),
         ]));
 
@@ -82,7 +82,7 @@ final class BotDetectionTest extends AbstractMiddlewareTestCase
     {
         $echoed = $this->echoed($this->request($this->signedUri('tx_solr%5Bq%5D=bar', self::botPayload(['webdriver' => true])), [
             '_s' => ['q' => 'foo'],
-            '_ss' => $this->signedPayload(''),
+            '_ss' => $this->signedPayload('', ['[q]']),
             '_solr_bot' => self::botPayload(),
         ]));
 
@@ -124,6 +124,20 @@ final class BotDetectionTest extends AbstractMiddlewareTestCase
 
         self::assertSame(200, $this->request($this->suggestUri($payload))->getStatusCode());
         $this->assertForbidden($this->request($this->signedUri('tx_solr%5Bq%5D=foo', $payload)));
+    }
+
+    #[Test]
+    public function suggestRequestWithHumanPayloadStillNeedsUntamperedSignedParameters(): void
+    {
+        $data = json_decode((string)base64_decode($this->signedPayload('tx_solr%5BadditionalFilters%5D%5B0%5D=type%3Apages'), true), true);
+        self::assertIsArray($data);
+        $data['p'] = 'tx_solr%5BadditionalFilters%5D%5B0%5D=type%3Anews';
+        $bot = '&_solr_bot=' . rawurlencode(self::botPayload());
+
+        $tampered = $this->request('/?type=7384&tx_solr%5BqueryString%5D=fo&_ss=' . rawurlencode(base64_encode((string)json_encode($data))) . $bot);
+        $this->assertForbidden($tampered);
+        self::assertSame('', (string)$tampered->getBody());
+        $this->assertForbidden($this->request($this->suggestUri(self::botPayload()) . '&tx_solr%5BadditionalFilters%5D%5B0%5D=type%3Anews'));
     }
 
     #[Test]

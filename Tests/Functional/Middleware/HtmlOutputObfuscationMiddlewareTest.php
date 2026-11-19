@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MaikSchneider\SolrShield\Tests\Functional\Middleware;
 
 use MaikSchneider\SolrShield\Service\TokenService;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 
 final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCase
@@ -24,16 +25,61 @@ final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCa
     {
         $html = (string)$this->request('/form')->getBody();
 
-        self::assertSame(2, substr_count($html, 'name="_ss"'));
+        self::assertSame(7, substr_count($html, 'name="_ss"'));
         self::assertMatchesRegularExpression('#<form id="search".*name="_ss".*</form>#s', explode('<form id="newsletter"', $html)[0]);
     }
 
     #[Test]
-    public function injectedTokenIsASignedEmptyPayload(): void
+    public function injectedTokenSignsHiddenValuesAndFreeFieldsOfItsForm(): void
     {
-        $data = json_decode((string)base64_decode($this->injectedSs(), true), true);
+        self::assertSame(
+            ['params' => ['tx_solr' => ['filter' => ['type:pages']]], 'freeFields' => ['[q]']],
+            $this->get(TokenService::class)->decode($this->injectedSs())
+        );
+    }
 
-        self::assertSame(['p' => '', 's' => $this->get(TokenService::class)->generateToken()], $data);
+    #[Test]
+    public function hiddenFieldsAreRecognizedLikeTheBrowserParsesThem(): void
+    {
+        self::assertSame(
+            [
+                'params' => ['tx_solr' => ['filter' => ['type:pages', 'author:jane', 'year:2026', 'lang:en']]],
+                'freeFields' => ['[q]'],
+            ],
+            $this->get(TokenService::class)->decode($this->injectedSs('markup'))
+        );
+    }
+
+    #[Test]
+    public function customElementsAreNoControls(): void
+    {
+        self::assertSame(
+            ['params' => ['tx_solr' => ['filter' => ['type:pages']]], 'freeFields' => ['[q]']],
+            $this->get(TokenService::class)->decode($this->injectedSs('custom-elements'))
+        );
+    }
+
+    /**
+     * @return array<string, array{string, array<string, mixed>}>
+     */
+    public static function fallbackSubmissions(): array
+    {
+        return [
+            'checkbox checked' => ['type:news', ['tx_solr' => ['filter' => ['type:news']]]],
+            'checkbox unchecked' => ['', ['tx_solr' => ['filter' => ['']]]],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $expected
+     */
+    #[Test]
+    #[DataProvider('fallbackSubmissions')]
+    public function checkboxCanReplaceItsHiddenFallbackValue(string $value, array $expected): void
+    {
+        $uri = '/search?_s%5Bfilter%5D%5B0%5D=' . rawurlencode($value) . '&_ss=' . rawurlencode($this->injectedSs('fallback'));
+
+        self::assertSame($expected, $this->echoed($this->request($uri))['query']);
     }
 
     #[Test]
@@ -72,10 +118,7 @@ final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCa
         self::assertSame('7384', $query['type'] ?? null);
         self::assertSame('0', $query['L'] ?? null);
         self::assertIsString($query['_ss'] ?? null);
-        self::assertSame(
-            ['p' => '', 's' => $this->get(TokenService::class)->generateToken()],
-            json_decode((string)base64_decode($query['_ss'], true), true)
-        );
+        self::assertSame(['params' => [], 'freeFields' => []], $this->get(TokenService::class)->decode($query['_ss']));
     }
 
     #[Test]
@@ -102,10 +145,10 @@ final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCa
         return html_entity_decode($value, ENT_QUOTES);
     }
 
-    private function injectedSs(): string
+    private function injectedSs(string $formId = 'search'): string
     {
         $html = (string)$this->request('/form')->getBody();
-        preg_match('/name="_ss" value="([^"]+)"/', $html, $matches);
+        preg_match('#<form id="' . $formId . '".*?name="_ss" value="([^"]+)"#s', $html, $matches);
         $value = $matches[1] ?? '';
         self::assertNotSame('', $value, $html);
 

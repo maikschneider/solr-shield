@@ -106,27 +106,28 @@ Placeholders and custom facet types
 Some URLs are templates that the browser completes, for example the
 ``___FROM___`` and ``___TO___`` placeholders of range facets. With URI
 obfuscation these placeholders sit inside the base64-encoded ``_ss``
-payload, where a plain string replacement on the URL cannot find them.
-Decode the payload, fill in the values, and encode it again, as the
-patched range facet scripts do:
+payload, and its signature breaks as soon as the payload changes. Leave
+``_ss`` as it is and send the values as ``_sr[from]`` and ``_sr[to]``, as the
+patched range facet scripts do. The middleware fills them into the
+``___FROM___`` and ``___TO___`` placeholders of the signed parameters and
+accepts numbers only:
 
 ..  code-block:: javascript
 
     function solrShieldFillUrl(template, values) {
       const url = new URL(template, window.location.href);
-      const signed = url.searchParams.get('_ss');
-      const fill = (subject, encode) => Object.keys(values).reduce(
-        (result, placeholder) => result.replace(placeholder, encode(String(values[placeholder]))),
-        subject
-      );
-      if (signed === null) {
-        return fill(template, (value) => value);
+      if (url.searchParams.get('_ss') === null) {
+        return Object.keys(values).reduce(
+          (result, placeholder) => result.replace(placeholder, String(values[placeholder])),
+          template
+        );
       }
-      const payload = JSON.parse(atob(signed));
-      payload.p = fill(payload.p, encodeURIComponent);
-      url.searchParams.set('_ss', btoa(JSON.stringify(payload)));
+      url.searchParams.set('_sr[from]', String(values.___FROM___));
+      url.searchParams.set('_sr[to]', String(values.___TO___));
       return url.toString();
     }
+
+Other placeholders cannot be filled in the browser with URI obfuscation.
 
 EXT:solr's own ``###tx_solr:…###`` link templates are filled in on the
 server before encoding and need nothing.

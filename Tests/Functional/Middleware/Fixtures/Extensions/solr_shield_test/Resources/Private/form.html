@@ -9,8 +9,46 @@
 <form id="filtered" action="/search" method="get" data-suggest="/?type=7384&amp;_ss=FILTERS">
     <input type="text" name="tx_solr[q]" value="">
 </form>
+<form id="facets" action="/search" method="get">
+    <input type="hidden" name="tx_solr[filter][]" value="type:pages">
+    <label><input type="checkbox" name="tx_solr[filter][]" value="author:jane"> Jane</label>
+    <label><input type="checkbox" name="tx_solr[filter][]" value="author:joe"> Joe</label>
+</form>
 <form id="newsletter" action="/newsletter" method="post">
     <input type="email" name="email">
+</form>
+<form id="markup" action="/search" method="get">
+    <INPUT TYPE="HIDDEN" name="tx_solr[filter][0]" value="type:pages">
+    <input type=hidden name="tx_solr[filter][1]" value=author:jane>
+    <input data-note=" type='text'" type="hidden" name="tx_solr[filter][2]" value="year:2026">
+    <input type="hidden" data-note="a>b" name="tx_solr[filter][3]" value="lang:en">
+    <input type="hidden" name="tx_solr[filter][4]" value="type:news" disabled>
+    <!-- <input type="hidden" name="tx_solr[filter][5]" value="type:news"> -->
+    <div data-note='<input type="text" name="tx_solr[filter][0]">'></div>
+    <script>const note = '<input type="text" name="tx_solr[filter][2]">';</script>
+    <input type="checkbox" name="tx_solr[filter][1]" value="author:joe" disabled>
+    <input type="text" name="tx_solr[q]" value="">
+</form>
+<form id="textarea" action="/search" method="get">
+    <input type="hidden" name="tx_solr[filter][0]" value="type:pages">
+    <textarea name="tx_solr[q]"><input type="text" name="tx_solr[filter][1]"></textarea>
+</form>
+<form id="custom-elements" action="/search" method="get">
+    <script-note></script-note>
+    <style-note></style-note>
+    <textarea-wrapper>
+        <input type="hidden" name="tx_solr[filter][0]" value="type:pages">
+        <textarea name="tx_solr[q]"></textarea>
+    </textarea-wrapper>
+    <input-group type="hidden" name="tx_solr[filter][1]" value="type:news"></input-group>
+    <select-menu name="tx_solr[filter][2]"></select-menu>
+    <button-group name="tx_solr[filter][3]"></button-group>
+    <script>const note = 1;</script>
+    <style>p { color: red; }</style>
+</form>
+<form id="fallback" action="/search" method="get">
+    <input type="hidden" name="tx_solr[filter][0]" value="">
+    <input type="checkbox" name="tx_solr[filter][0]" value="type:news">
 </form>
 </body>
 </html>

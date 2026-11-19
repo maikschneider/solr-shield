@@ -61,10 +61,7 @@ final readonly class AfterLinkIsGeneratedEventListener
             ARRAY_FILTER_USE_KEY
         );
 
-        $payload = base64_encode((string)json_encode([
-            'p' => http_build_query($txSolrParams),
-            's' => $this->tokenService->generateToken(),
-        ]));
+        $payload = $this->tokenService->encode(http_build_query($txSolrParams));
 
         $newQuery = http_build_query(array_merge($otherParams, ['_ss' => $payload]));
         $newUrl = preg_replace('/\?.*$/', '', $url) . ($newQuery !== '' ? '?' . $newQuery : '');

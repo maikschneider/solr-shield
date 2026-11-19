@@ -46,12 +46,9 @@ abstract class ListenerTestCase extends UnitTestCase
         self::assertArrayHasKey('_ss', $query, $url);
         self::assertIsString($query['_ss']);
 
-        $data = json_decode((string)base64_decode($query['_ss'], true), true);
-        self::assertIsArray($data);
-        self::assertSame((new TokenService())->generateToken(), $data['s'] ?? null);
-        self::assertIsString($data['p'] ?? null);
-        parse_str($data['p'], $payload);
+        $decoded = (new TokenService())->decode($query['_ss']);
+        self::assertNotNull($decoded, 'invalid signature');
 
-        return ['query' => $query, 'payload' => $payload];
+        return ['query' => $query, 'payload' => $decoded['params']];
     }
 }

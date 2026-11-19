@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace MaikSchneider\SolrShield\Tests\Functional\Middleware;
 
-use MaikSchneider\SolrShield\Service\TokenService;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 
@@ -66,7 +65,7 @@ final class SolrShieldMiddlewareTest extends AbstractMiddlewareTestCase
     #[Test]
     public function obfuscatedFormFieldsAreMappedBackToTxSolr(): void
     {
-        $uri = '/search?_s%5Bq%5D=foo&_s%5Bfilter%5D%5B0%5D=type%3Apages&_ss=' . rawurlencode($this->signedPayload(''));
+        $uri = '/search?_s%5Bq%5D=foo&_s%5Bfilter%5D%5B0%5D=type%3Apages&_ss=' . rawurlencode($this->signedPayload('tx_solr%5Bfilter%5D%5B0%5D=type%3Apages', ['[q]']));
 
         $query = $this->echoed($this->request($uri))['query'];
 
@@ -76,9 +75,42 @@ final class SolrShieldMiddlewareTest extends AbstractMiddlewareTestCase
     #[Test]
     public function obfuscatedFormFieldsInPostBodyAreMappedBackToTxSolr(): void
     {
-        $echoed = $this->echoed($this->request('/search', ['_s' => ['q' => 'foo'], '_ss' => $this->signedPayload('')]));
+        $echoed = $this->echoed($this->request('/search', ['_s' => ['q' => 'foo'], '_ss' => $this->signedPayload('', ['[q]'])]));
 
         self::assertSame(['tx_solr' => ['q' => 'foo']], $echoed['body']);
+    }
+
+    #[Test]
+    public function formPostedToSignedLinkKeepsTheLinkParameters(): void
+    {
+        $uri = '/search?_ss=' . rawurlencode($this->signedPayload('tx_solr%5Bq%5D=bike'));
+        $body = ['_s' => ['resultsPerPage' => '5'], '_ss' => $this->signedPayload('', ['[resultsPerPage]'])];
+
+        $echoed = $this->echoed($this->request($uri, $body));
+
+        self::assertSame(['tx_solr' => ['q' => 'bike']], $echoed['query']);
+        self::assertSame(['tx_solr' => ['resultsPerPage' => '5']], $echoed['body']);
+    }
+
+    #[Test]
+    public function formPostedToSignedRangeLinkFillsTheLinkRange(): void
+    {
+        $uri = '/search?_ss=' . rawurlencode($this->signedPayload('tx_solr%5Bfilter%5D%5B0%5D=uidRange%3A___FROM___-___TO___'))
+            . '&_sr%5Bfrom%5D=1&_sr%5Bto%5D=5';
+        $body = ['_s' => ['resultsPerPage' => '5'], '_ss' => $this->signedPayload('', ['[resultsPerPage]'])];
+
+        $echoed = $this->echoed($this->request($uri, $body));
+
+        self::assertSame(['tx_solr' => ['filter' => ['uidRange:1-5']]], $echoed['query']);
+    }
+
+    #[Test]
+    public function formPostedToForgedLinkIsRejected(): void
+    {
+        $uri = '/search?_ss=' . rawurlencode($this->payloadWithSignature('tx_solr%5Bq%5D=bike', 'AAAAAAAAAAAAAAAA'));
+        $body = ['_s' => ['resultsPerPage' => '5'], '_ss' => $this->signedPayload('', ['[resultsPerPage]'])];
+
+        $this->assertForbidden($this->request($uri, $body));
     }
 
     #[Test]
@@ -128,7 +160,7 @@ final class SolrShieldMiddlewareTest extends AbstractMiddlewareTestCase
     #[Test]
     public function signedPayloadWithoutQueryStringIsRejected(): void
     {
-        $ss = base64_encode((string)json_encode(['s' => $this->get(TokenService::class)->generateToken()]));
+        $ss = base64_encode((string)json_encode(['s' => 'AAAAAAAAAAAAAAAA']));
 
         $this->assertForbidden($this->request('/search?_ss=' . rawurlencode($ss)));
     }
@@ -136,7 +168,7 @@ final class SolrShieldMiddlewareTest extends AbstractMiddlewareTestCase
     #[Test]
     public function signedPayloadWithNonStringQueryStringIsRejected(): void
     {
-        $ss = base64_encode((string)json_encode(['p' => ['tx_solr' => ['q' => 'foo']], 's' => $this->get(TokenService::class)->generateToken()]));
+        $ss = base64_encode((string)json_encode(['p' => ['tx_solr' => ['q' => 'foo']], 's' => 'AAAAAAAAAAAAAAAA']));
 
         $this->assertForbidden($this->request('/search?_ss=' . rawurlencode($ss)));
     }
@@ -144,7 +176,7 @@ final class SolrShieldMiddlewareTest extends AbstractMiddlewareTestCase
     #[Test]
     public function payloadWithForgedSignatureIsRejected(): void
     {
-        $ss = $this->signedPayload('tx_solr%5Bq%5D=foo', 'AAAAAAAAAAAAAAAA');
+        $ss = $this->payloadWithSignature('tx_solr%5Bq%5D=foo', 'AAAAAAAAAAAAAAAA');
 
         $this->assertForbidden($this->request('/search?_ss=' . rawurlencode($ss)));
     }

@@ -1,21 +1,19 @@
 // Solr Shield: copy of EXT:solr 14's facet_daterange_controller.js. Changes are marked "Solr Shield".
 //
-// The facet URL template arrives inside the signed `_ss` payload, so the range
-// placeholders have to be filled in there. Navigating through a link click
-// instead of assigning window.location lets solr-shield.js attach `_solr_bot`.
+// The facet URL template arrives inside the signed `_ss` payload, which must
+// not change, so the range travels next to it in `_sr[from]` and `_sr[to]`.
+// Navigating through a link click instead of assigning window.location lets
+// solr-shield.js attach `_solr_bot`.
 function solrShieldFillUrl(template, values) {
   const url = new URL(template, window.location.href);
-  const signed = url.searchParams.get('_ss');
-  const fill = (subject, encode) => Object.keys(values).reduce(
-    (result, placeholder) => result.replace(placeholder, encode(String(values[placeholder]))),
-    subject
-  );
-  if (signed === null) {
-    return fill(template, (value) => value);
+  if (url.searchParams.get('_ss') === null) {
+    return Object.keys(values).reduce(
+      (result, placeholder) => result.replace(placeholder, String(values[placeholder])),
+      template
+    );
   }
-  const payload = JSON.parse(atob(signed));
-  payload.p = fill(payload.p, encodeURIComponent);
-  url.searchParams.set('_ss', btoa(JSON.stringify(payload)));
+  url.searchParams.set('_sr[from]', String(values.___FROM___));
+  url.searchParams.set('_sr[to]', String(values.___TO___));
   return url.toString();
 }
 
