@@ -135,6 +135,32 @@ port the changes marked ``Solr Shield`` in
 ``EXT:solr_shield/Resources/Public/JavaScript/Solr/`` to your script, and
 compare them again after updating EXT:solr.
 
+..  _integration-turbo:
+
+Turbo and other SPA navigation
+==============================
+
+`Turbo Drive <https://turbo.hotwired.dev/>`__ and similar libraries swap
+the page body without a page load and run its scripts again. Solr Shield
+supports this:
+
+*   ``solr-shield.js`` sets itself up once per document. Every visit
+    restarts the elapsed time, as a page load would; the interaction
+    signals keep counting.
+*   Turbo's hover prefetch is cancelled for links that carry ``_ss``. The
+    prefetch would have no current ``_solr_bot`` and be rejected, and the
+    click loads the freshly signed URL anyway.
+*   The patched range facet scripts bind to the new page on every visit.
+
+Keep the scripts in the page footer, where EXT:solr's examples include
+them, so they run on every visit.
+
+EXT:solr's own ``suggest_controller.js`` fails when it runs a second time
+(``Identifier 'SuggestController' has already been declared``), so
+autocomplete only works on pages loaded in full. Add
+``data-turbo="false"`` to links and forms that lead to pages with a search
+form if you need it there.
+
 ..  _integration-other-formats:
 
 Responses that are not HTML
@@ -161,3 +187,5 @@ and bot detection off:
 *   Autocomplete shows suggestions.
 *   Requests in the browser's network panel carry ``_ss``, and with bot
     detection also ``_solr_bot``.
+*   With Turbo or a similar library, repeat these checks on a page reached
+    through a visit (see :ref:`integration-turbo` for autocomplete).

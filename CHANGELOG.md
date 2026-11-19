@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Turbo Drive and similar SPA navigation.** `solr-shield.js` sets itself up once per document instead of on every visit, Turbo's hover prefetch is cancelled for `_ss` links, and the patched TYPO3 14 range facet scripts work on pages reached through a visit ([#21](https://github.com/maikschneider/solr-shield/issues/21)).
+
 ## [1.0.1] - 2026-10-23
 
 ### Added
