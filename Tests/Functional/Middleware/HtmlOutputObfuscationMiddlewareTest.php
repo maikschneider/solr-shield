@@ -25,7 +25,7 @@ final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCa
     {
         $html = (string)$this->request('/form')->getBody();
 
-        self::assertSame(15, substr_count($html, 'name="_ss"'));
+        self::assertSame(16, substr_count($html, 'name="_ss"'));
         self::assertMatchesRegularExpression('#<form id="search".*name="_ss".*</form>#s', explode('<form id="newsletter"', $html)[0]);
     }
 
@@ -87,6 +87,15 @@ final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCa
         self::assertSame(
             ['params' => [], 'freeFields' => ['[q]']],
             $this->get(TokenService::class)->decode($this->formSs('commented'))
+        );
+    }
+
+    #[Test]
+    public function rawTextContentOpensNoFieldsetAndNoForm(): void
+    {
+        self::assertSame(
+            ['params' => [], 'freeFields' => ['[q]']],
+            $this->get(TokenService::class)->decode($this->formSs('raw-text'))
         );
     }
 

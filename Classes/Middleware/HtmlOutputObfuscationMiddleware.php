@@ -226,13 +226,14 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
     private function findFormsAndControls(string $html): array
     {
         // Every tag is consumed whole, so tag-like text inside an attribute
-        // value, a comment, a script, a style or a textarea never counts as a tag.
+        // value, a comment, a textarea or another raw-text element (script,
+        // style, iframe, …) never counts as a tag.
         // A tag name ends at whitespace, `/` or `>`, so `<textarea-wrapper>` is no textarea.
         // Possessive loops keep large inline content within PCRE's backtrack limit.
         // Tags are matched one at a time, so a tag-heavy page needs little memory.
         $attributePattern = '((?:[^>"\']++|"[^"]*+"|\'[^\']*+\')*+)';
         $tagPattern = '/<!--[^-]*+(?:-(?!->)[^-]*+)*+-->'
-            . '|<(script|style)(?=[\t\n\f\r \/>])[^<]*+(?:<(?!\/\1\s*>)[^<]*+)*+<\/\1\s*>'
+            . '|<(script|style|iframe|noembed|noframes|title|xmp)(?=[\t\n\f\r \/>])[^<]*+(?:<(?!\/\1\s*>)[^<]*+)*+<\/\1\s*>'
             . '|(?|<(textarea)(?=[\t\n\f\r \/>])' . $attributePattern . '>[^<]*+(?:<(?!\/textarea\s*>)[^<]*+)*+<\/textarea\s*>'
             . '|<([a-z][^\t\n\f\r \/>]*+)' . $attributePattern . '>)'
             . '|<\/([a-z][^\t\n\f\r \/>]*+)[^>]*+>/is';
