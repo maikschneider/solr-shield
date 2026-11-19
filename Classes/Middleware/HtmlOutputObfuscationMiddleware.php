@@ -251,6 +251,15 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
             $offset = $tag[0][1] + strlen((string)$tag[0][0]);
             // Start tags by name, end tags as `/name`.
             $tagName = strtolower($tag[1][0] ?? (isset($tag[3][0]) ? '/' . $tag[3][0] : ''));
+            // Like the browser, ignore a form inside a form.
+            $isIgnoredForm = $tagName === 'form' && $openForm !== null;
+            // A template's content is no part of the document, the template itself is.
+            if ($templateDepth === 0 && isset($tag[2][0]) && !$isIgnoredForm && stripos($tag[2][0], 'id') !== false) {
+                $id = $this->parseAttributes($tag[2][0])['id'] ?? '';
+                if ($id !== '' && !array_key_exists($id, $formIndexById)) {
+                    $formIndexById[$id] = $tagName === 'form' ? count($forms) : null;
+                }
+            }
             if ($tagName === 'template' || $tagName === '/template') {
                 $templateDepth = max(0, $templateDepth + ($tagName === 'template' ? 1 : -1));
                 continue;
@@ -264,14 +273,6 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
             $innermostFieldset = array_key_last($fieldsets);
             if ($innermostFieldset !== null && $fieldsets[$innermostFieldset][1] === 0) {
                 $fieldsets[$innermostFieldset] = $this->trackFirstLegendChild($fieldsets[$innermostFieldset], $tagName);
-            }
-            // Like the browser, ignore a form inside a form.
-            $isIgnoredForm = $tagName === 'form' && $openForm !== null;
-            if (isset($tag[2][0]) && !$isIgnoredForm && stripos($tag[2][0], 'id') !== false) {
-                $id = $this->parseAttributes($tag[2][0])['id'] ?? '';
-                if ($id !== '' && !array_key_exists($id, $formIndexById)) {
-                    $formIndexById[$id] = $tagName === 'form' ? count($forms) : null;
-                }
             }
             switch ($tagName) {
                 case 'form':
