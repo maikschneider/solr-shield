@@ -144,9 +144,9 @@ Turbo and other SPA navigation
 the page body without a page load and run its scripts again. Solr Shield
 supports this:
 
-*   ``solr-shield.js`` sets itself up once per document. Signals keep
-    counting across visits, and the elapsed time starts at the first full
-    page load.
+*   ``solr-shield.js`` sets itself up once per document. Every visit
+    restarts the elapsed time, as a page load would; the interaction
+    signals keep counting.
 *   Turbo's hover prefetch is cancelled for links that carry ``_ss``. The
     prefetch would have no current ``_solr_bot`` and be rejected, and the
     click loads the freshly signed URL anyway.

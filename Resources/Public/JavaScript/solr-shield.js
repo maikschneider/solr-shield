@@ -10,13 +10,17 @@
   'use strict';
 
   // Turbo Drive and similar libraries run body scripts again on every visit,
-  // while the document and its listeners stay. Once per document is enough.
-  if (window.solrShieldInitialized) {
+  // while the document and its listeners stay. Set up once per document, and
+  // restart the clock on every visit as a page load would.
+  if (window.solrShieldRestart) {
+    window.solrShieldRestart();
     return;
   }
-  window.solrShieldInitialized = true;
 
-  const startTime = Date.now();
+  let startTime = Date.now();
+  window.solrShieldRestart = () => {
+    startTime = Date.now();
+  };
   const signals = {
     mouseMoveCount: 0,
     scrollCount: 0,
