@@ -44,6 +44,9 @@ URI obfuscation
         host and port, otherwise to the site root. Only the path and query of
         the referer are kept.
 
+    Rejected autocomplete requests always get the empty ``403``: the
+    autocomplete script expects JSON and cannot follow a redirect to a page.
+
 ..  _configuration-bot-detection:
 
 Bot detection
@@ -56,7 +59,7 @@ Bot detection
 
     Include the bot-detection script and reject Solr requests whose
     behavioural payload is missing or scores too low (see
-    :ref:`how-it-works-bot-detection`). Autocomplete requests are exempt.
+    :ref:`how-it-works-bot-detection`), autocomplete requests included.
 
     ..  attention::
         Visitors without JavaScript can no longer search or follow filter
@@ -68,6 +71,8 @@ Bot detection
     :default: 3
 
     Seconds between page load and a search. Faster requests fail one check.
+    Autocomplete requests skip this check, because visitors often start
+    typing right after the page has loaded.
 
 ..  confval:: solrShield.botDetection.securityLevel
     :name: setting-botDetection-securityLevel
