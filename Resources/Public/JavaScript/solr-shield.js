@@ -55,8 +55,10 @@
   // A field may be linked to its form through the `form` attribute from
   // outside, e.g. the token of a form inside a disabled fieldset. The native
   // getter still works when a field named `elements` shadows `form.elements`.
+  // A disabled field, also one disabled by its fieldset, is not submitted.
   const formElements = Object.getOwnPropertyDescriptor(HTMLFormElement.prototype, 'elements').get;
-  const formField = (form, name) => Array.from(formElements.call(form)).find((element) => element.name === name);
+  const formField = (form, name) => Array.from(formElements.call(form))
+    .find((element) => element.name === name && !element.matches(':disabled'));
 
   const signForm = (form) => {
     const token = form instanceof HTMLFormElement ? formField(form, '_ss') : undefined;

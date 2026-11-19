@@ -56,6 +56,7 @@ const load = (baseURI = 'https://example.com/news/page') => {
 };
 
 // A form field with its attributes; after() records the node inserted next to it.
+// `disabled` stands for being disabled itself or through a fieldset.
 const element = (attributes = {}) => ({
   name: attributes.name ?? '',
   value: '',
@@ -68,6 +69,9 @@ const element = (attributes = {}) => ({
   },
   setAttribute(name, value) {
     this.attributes[name] = value;
+  },
+  matches(selector) {
+    return selector === ':disabled' && 'disabled' in this.attributes;
   },
   after(node) {
     this.next = node;
@@ -188,6 +192,18 @@ test('a form reuses its payload field and leaves forms without a token alone', (
 
   assert.notEqual(bot.value, '');
   assert.equal(unsigned.next, undefined);
+});
+
+test('a form does not fill a disabled payload field, which the browser would not submit', () => {
+  const { HTMLFormElement, submit } = load();
+  const disabled = element({ name: '_solr_bot', form: 'search', disabled: '' });
+  const token = element({ name: '_ss', form: 'search' });
+
+  submit(formWith(HTMLFormElement, [disabled, token]));
+
+  assert.equal(disabled.value, '');
+  assert.equal(token.next.name, '_solr_bot');
+  assert.notEqual(token.next.value, '');
 });
 
 test('a field named elements does not hide the token', () => {
