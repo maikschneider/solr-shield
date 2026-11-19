@@ -172,14 +172,7 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
      */
     private function injectSsTokenIntoForms(string $html): string
     {
-        [$forms, $controls] = $this->findFormsAndControls($html);
-
-        $formIndexById = [];
-        foreach ($forms as $index => [$id]) {
-            if ($id !== '') {
-                $formIndexById[$id] ??= $index;
-            }
-        }
+        [$forms, $controls, $formIndexById] = $this->findFormsAndControls($html);
 
         // Like the browser, a control with a `form` attribute belongs to the
         // form with that id, or to no form if there is none, wherever it sits.
@@ -187,7 +180,7 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
         $firstControlByForm = [];
         foreach ($controls as [$parentForm, $tagName, $attributes, $offset]) {
             $owner = isset($attributes['form']) ? $formIndexById[$attributes['form']] ?? null : $parentForm;
-            if ($owner !== null && $forms[$owner][1] !== null) {
+            if ($owner !== null && $forms[$owner][0] !== null) {
                 $controlsByForm[$owner][] = [$tagName, $attributes];
                 $firstControlByForm[$owner] ??= [$offset, $attributes['form'] ?? null];
             }
@@ -196,7 +189,7 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
         $hiddenFields = [];
         foreach ($controlsByForm as $index => $formControls) {
             $hiddenField = '<input type="hidden" name="_ss" value="' . htmlspecialchars($this->signForm($formControls), ENT_QUOTES) . '"';
-            [, $endOffset, $endDisabled] = $forms[$index];
+            [$endOffset, $endDisabled] = $forms[$index];
             if ($endDisabled) {
                 // The end tag sits in a disabled fieldset, which would disable the
                 // token. In front of the first control, with its `form` attribute,
@@ -220,10 +213,11 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
     /**
      * All forms and enabled `_s[…]` controls of the document, in document order.
      *
-     * @return array{list<array{string, ?int, bool}>, list<array{?int, string, array<string, string>, int}>}
-     *     forms with id, offset of their end tag (null if unclosed) and whether
-     *     that end tag sits in a disabled fieldset, and controls with their
-     *     enclosing form, lowercase tag name, attributes and offset
+     * @return array{list<array{?int, bool}>, list<array{?int, string, array<string, string>, int}>, array<string, ?int>}
+     *     forms with the offset of their end tag (null if unclosed) and whether
+     *     that end tag sits in a disabled fieldset, controls with their
+     *     enclosing form, lowercase tag name, attributes and offset, and the
+     *     form each id names (null if the first element with it is no form)
      */
     private function findFormsAndControls(string $html): array
     {
@@ -240,6 +234,9 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
             . '|<\/([a-z][^\t\n\f\r \/>]*+)[^>]*+>/is';
         $forms = [];
         $controls = [];
+        // Like the browser, a `form` attribute names the first element with
+        // that id, which owns the control only if it is a form.
+        $formIndexById = [];
         $openForm = null;
         // The content of a template is no part of the document.
         $templateDepth = 0;
@@ -268,17 +265,24 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
             if ($innermostFieldset !== null && $fieldsets[$innermostFieldset][1] === 0) {
                 $fieldsets[$innermostFieldset] = $this->trackFirstLegendChild($fieldsets[$innermostFieldset], $tagName);
             }
+            // Like the browser, ignore a form inside a form.
+            $isIgnoredForm = $tagName === 'form' && $openForm !== null;
+            if (isset($tag[2][0]) && !$isIgnoredForm && stripos($tag[2][0], 'id') !== false) {
+                $id = $this->parseAttributes($tag[2][0])['id'] ?? '';
+                if ($id !== '' && !array_key_exists($id, $formIndexById)) {
+                    $formIndexById[$id] = $tagName === 'form' ? count($forms) : null;
+                }
+            }
             switch ($tagName) {
                 case 'form':
-                    // Like the browser, ignore a form inside a form.
-                    if ($openForm === null) {
-                        $forms[] = [$this->parseAttributes((string)$tag[2][0])['id'] ?? '', null, false];
+                    if (!$isIgnoredForm) {
+                        $forms[] = [null, false];
                         $openForm = array_key_last($forms);
                     }
                     break;
                 case '/form':
                     if ($openForm !== null) {
-                        $forms[$openForm] = [$forms[$openForm][0], $tag[0][1], $this->isDisabledByFieldset($fieldsets)];
+                        $forms[$openForm] = [$tag[0][1], $this->isDisabledByFieldset($fieldsets)];
                         $openForm = null;
                     }
                     break;
@@ -310,7 +314,7 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
             throw new \RuntimeException('Could not find the forms to sign: ' . preg_last_error_msg(), 1795110108);
         }
 
-        return [$forms, $controls];
+        return [$forms, $controls, $formIndexById];
     }
 
     /**

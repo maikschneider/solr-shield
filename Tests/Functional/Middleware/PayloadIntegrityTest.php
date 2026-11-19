@@ -143,6 +143,7 @@ final class PayloadIntegrityTest extends AbstractMiddlewareTestCase
             'template' => ['templated'],
             'iframe with a quoted end tag' => ['framed'],
             'datalist' => ['datalisted'],
+            'other element with the id first' => ['shadowed'],
         ];
     }
 
