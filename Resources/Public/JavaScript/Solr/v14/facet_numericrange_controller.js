@@ -28,7 +28,9 @@ function solrShieldNavigate(url) {
   link.remove();
 }
 
-class NumericRangeFacetController {
+// Solr Shield: Turbo Drive and similar libraries run body scripts again on
+// every visit. `var` can be declared again where `class` and `const` throw.
+var NumericRangeFacetController = class {
   constructor(element) {
     this.element = element
     this.inputs = this.element.querySelectorAll('.tx-solr-numericRange__input');
@@ -171,10 +173,10 @@ class NumericRangeFacetController {
     this.setThumbEvents(this.inputMin, this.thumbLeft)
     this.setThumbEvents(this.inputMax, this.thumbRight)
   }
-}
+};
 
-const numericRangeFacetControllers = [];
-const initRangeSliders = () => {
+var numericRangeFacetControllers = [];
+var initRangeSliders = () => {
   numericRangeFacetControllers.length = 0;
   const rangeInputs = document.querySelectorAll(".facet-type-numericRange-data")
   if (rangeInputs.length) {
@@ -187,5 +189,9 @@ const initRangeSliders = () => {
 };
 
 initRangeSliders();
-window.addEventListener('resize', initRangeSliders);
-document.body.addEventListener("tx_solr_updated", initRangeSliders);
+// Solr Shield: listen once, on the document, which outlives a Turbo visit.
+if (!window.solrShieldNumericRangeListening) {
+  window.solrShieldNumericRangeListening = true;
+  window.addEventListener('resize', initRangeSliders);
+  document.addEventListener("tx_solr_updated", initRangeSliders);
+}

@@ -9,6 +9,13 @@
 (() => {
   'use strict';
 
+  // Turbo Drive and similar libraries run body scripts again on every visit,
+  // while the document and its listeners stay. Once per document is enough.
+  if (window.solrShieldInitialized) {
+    return;
+  }
+  window.solrShieldInitialized = true;
+
   const startTime = Date.now();
   const signals = {
     mouseMoveCount: 0,
@@ -62,25 +69,42 @@
     nativeSubmit.call(this);
   };
 
-  // The href is rewritten at the last moment, right before the browser (or a
-  // script that loads the link via AJAX) reads it, so the payload is fresh.
-  const signLink = (event) => {
-    const link = event.target instanceof Element ? event.target.closest('a[href]') : null;
+  const searchUrl = (target) => {
+    const link = target instanceof Element ? target.closest('a[href]') : null;
     if (!link) {
-      return;
+      return null;
     }
     const url = new URL(link.href, window.location.href);
     if (url.origin !== window.location.origin || !url.searchParams.has('_ss')) {
-      return;
+      return null;
     }
     // A fragment link inherits the page's query; changing it would reload the search.
     if (url.hash && url.href.split('#')[0] === window.location.href.split('#')[0]) {
+      return null;
+    }
+    return { link, url };
+  };
+
+  // The href is rewritten at the last moment, right before the browser (or a
+  // script that loads the link via AJAX) reads it, so the payload is fresh.
+  const signLink = (event) => {
+    const search = searchUrl(event.target);
+    if (!search) {
       return;
     }
-    url.searchParams.set('_solr_bot', payload());
-    link.href = url.toString();
+    search.url.searchParams.set('_solr_bot', payload());
+    search.link.href = search.url.toString();
   };
   ['pointerdown', 'click', 'auxclick', 'contextmenu'].forEach((type) => {
     document.addEventListener(type, signLink, true);
+  });
+
+  // Turbo prefetches links on hover, before any of the events above. The
+  // request would carry no payload or an outdated one, and the click fetches
+  // the freshly signed URL anyway.
+  document.addEventListener('turbo:before-prefetch', (event) => {
+    if (searchUrl(event.target)) {
+      event.preventDefault();
+    }
   });
 })();
