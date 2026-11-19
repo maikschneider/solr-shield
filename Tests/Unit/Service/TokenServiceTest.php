@@ -100,6 +100,16 @@ final class TokenServiceTest extends UnitTestCase
     }
 
     #[Test]
+    public function signatureCoversTheBoundaryBetweenQueryAndFreeFields(): void
+    {
+        $data = self::data((new TokenService())->encode(self::QUERY, ['[q]', '[sort]']));
+        $data['p'] .= "\n[q]";
+        $data['f'] = ['[sort]'];
+
+        self::assertNull((new TokenService())->decode(self::encodeRaw($data)));
+    }
+
+    #[Test]
     public function signatureDependsOnEncryptionKey(): void
     {
         $encoded = (new TokenService())->encode(self::QUERY);

@@ -62,7 +62,7 @@ final class TokenService
     {
         $raw = hash_hmac(
             'sha256',
-            "solr-shield\n" . $query . "\n" . implode("\n", $freeFields),
+            (string)json_encode(['solr-shield', $query, $freeFields], JSON_THROW_ON_ERROR),
             (string)($GLOBALS['TYPO3_CONF_VARS']['SYS']['encryptionKey'] ?? ''),
             true
         );
