@@ -127,6 +127,20 @@ final class BotDetectionTest extends AbstractMiddlewareTestCase
     }
 
     #[Test]
+    public function suggestRequestWithHumanPayloadStillNeedsUntamperedSignedParameters(): void
+    {
+        $data = json_decode((string)base64_decode($this->signedPayload('tx_solr%5BadditionalFilters%5D%5B0%5D=type%3Apages'), true), true);
+        self::assertIsArray($data);
+        $data['p'] = 'tx_solr%5BadditionalFilters%5D%5B0%5D=type%3Anews';
+        $bot = '&_solr_bot=' . rawurlencode(self::botPayload());
+
+        $tampered = $this->request('/?type=7384&tx_solr%5BqueryString%5D=fo&_ss=' . rawurlencode(base64_encode((string)json_encode($data))) . $bot);
+        $this->assertForbidden($tampered);
+        self::assertSame('', (string)$tampered->getBody());
+        $this->assertForbidden($this->request($this->suggestUri(self::botPayload()) . '&tx_solr%5BadditionalFilters%5D%5B0%5D=type%3Anews'));
+    }
+
+    #[Test]
     public function requestWithoutSolrParametersNeedsNoPayload(): void
     {
         self::assertSame(['L' => '0'], $this->echoed($this->request('/search?L=0'))['query']);
