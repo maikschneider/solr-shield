@@ -17,6 +17,10 @@ const load = (baseURI = 'https://example.com/news/page') => {
     }
   }
   class HTMLFormElement {
+    get elements() {
+      return this.fields;
+    }
+
     submit() {}
   }
   const window = {
@@ -71,8 +75,8 @@ const element = (attributes = {}) => ({
 });
 
 // A form whose fields are associated with it, but none of them is a descendant.
-const formWith = (HTMLFormElement, elements) => Object.assign(new HTMLFormElement(), {
-  elements,
+const formWith = (HTMLFormElement, fields) => Object.assign(new HTMLFormElement(), {
+  fields,
   querySelector: () => null,
 });
 
@@ -184,4 +188,17 @@ test('a form reuses its payload field and leaves forms without a token alone', (
 
   assert.notEqual(bot.value, '');
   assert.equal(unsigned.next, undefined);
+});
+
+test('a field named elements does not hide the token', () => {
+  const { HTMLFormElement, submit } = load();
+  const shadowing = element({ name: 'elements' });
+  const token = element({ name: '_ss' });
+  const form = formWith(HTMLFormElement, [shadowing, token]);
+  // Like the browser's named property of a form.
+  Object.defineProperty(form, 'elements', { value: shadowing });
+
+  submit(form);
+
+  assert.equal(token.next.name, '_solr_bot');
 });
