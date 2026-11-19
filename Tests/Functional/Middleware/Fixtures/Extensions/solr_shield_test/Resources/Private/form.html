@@ -100,9 +100,20 @@
     <div><legend><input type="hidden" name="tx_solr[filter][]" value="lang:de" form="fieldset"></legend></div>
     <br><!-- <div> -->
     <legend><input type="hidden" name="tx_solr[filter][]" value="type:event" form="fieldset"></legend>
+    <style data-note="</style>"></fieldset></style>
+    <input type="hidden" name="tx_solr[filter][]" value="lang:fr" form="fieldset">
 </fieldset>
 <input type="hidden" name="tx_solr[filter][]" value="year:2026" form="fieldset">
 <iframe src="/embedded"><fieldset disabled></iframe><noembed><form id="raw-text"></form></noembed>
+<script data-note="</script>">const note = '<fieldset disabled>';</script>
 <form id="raw-text" action="/search" method="get"><input type="text" name="tx_solr[q]" value=""></form>
+<form id="framed" action="/search" method="get">
+    <input type="hidden" name="tx_solr[filter]" value="type:news">
+</form>
+<iframe data-note="</iframe>"><input type="text" name="tx_solr[filter]" value="" form="framed"></iframe>
+<form id="datalisted" action="/search" method="get">
+    <input type="hidden" name="tx_solr[filter]" value="type:news">
+</form>
+<datalist><input type="text" name="tx_solr[filter]" value="" form="datalisted"></datalist>
 </body>
 </html>

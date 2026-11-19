@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MaikSchneider\SolrShield\Tests\Functional\Middleware;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 
 /**
@@ -133,10 +134,23 @@ final class PayloadIntegrityTest extends AbstractMiddlewareTestCase
         $this->assertForbidden($this->request('/search?_s%5Bfilter%5D%5B%5D=type%3Anews&_s%5Bfilter%5D%5B%5D=lang%3Aen&_ss=' . $ss));
     }
 
-    #[Test]
-    public function fieldsInsideATemplateCannotUnlockAHiddenValue(): void
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function formsWithUnsubmittedFields(): array
     {
-        $ss = rawurlencode($this->formSs('templated'));
+        return [
+            'template' => ['templated'],
+            'iframe with a quoted end tag' => ['framed'],
+            'datalist' => ['datalisted'],
+        ];
+    }
+
+    #[Test]
+    #[DataProvider('formsWithUnsubmittedFields')]
+    public function fieldsTheBrowserDoesNotSubmitCannotUnlockAHiddenValue(string $formId): void
+    {
+        $ss = rawurlencode($this->formSs($formId));
 
         self::assertSame(['tx_solr' => ['filter' => 'type:news']], $this->echoed($this->request('/search?_s%5Bfilter%5D=type%3Anews&_ss=' . $ss))['query']);
         $this->assertForbidden($this->request('/search?_s%5Bfilter%5D=type%3Apages&_ss=' . $ss));

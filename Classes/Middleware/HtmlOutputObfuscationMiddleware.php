@@ -32,6 +32,8 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
 {
     private const RANGE_FACET_SCRIPTS = ['facet_daterange_controller', 'facet_numericrange_controller'];
 
+    private const RAW_TEXT_ELEMENTS = ['textarea', 'script', 'style', 'iframe', 'noembed', 'noframes', 'title', 'xmp'];
+
     private const VOID_ELEMENTS = ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr'];
 
     public function __construct(
@@ -233,8 +235,7 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
         // Tags are matched one at a time, so a tag-heavy page needs little memory.
         $attributePattern = '((?:[^>"\']++|"[^"]*+"|\'[^\']*+\')*+)';
         $tagPattern = '/<!--[^-]*+(?:-(?!->)[^-]*+)*+-->'
-            . '|<(script|style|iframe|noembed|noframes|title|xmp)(?=[\t\n\f\r \/>])[^<]*+(?:<(?!\/\1\s*>)[^<]*+)*+<\/\1\s*>'
-            . '|(?|<(textarea)(?=[\t\n\f\r \/>])' . $attributePattern . '>[^<]*+(?:<(?!\/textarea\s*>)[^<]*+)*+<\/textarea\s*>'
+            . '|(?|<(' . implode('|', self::RAW_TEXT_ELEMENTS) . ')(?=[\t\n\f\r \/>])' . $attributePattern . '>[^<]*+(?:<(?!\/\1\s*>)[^<]*+)*+<\/\1\s*>'
             . '|<([a-z][^\t\n\f\r \/>]*+)' . $attributePattern . '>)'
             . '|<\/([a-z][^\t\n\f\r \/>]*+)[^>]*+>/is';
         $forms = [];
@@ -242,6 +243,8 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
         $openForm = null;
         // The content of a template is no part of the document.
         $templateDepth = 0;
+        // The HTML spec leaves a control inside a datalist out of the submission.
+        $datalistDepth = 0;
         // Per open fieldset: whether it is disabled, whether its first legend
         // child, which it does not disable, is not yet seen (0), open (1) or
         // closed (2), and the elements open inside it until that legend is seen.
@@ -250,7 +253,7 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
         while (($found = preg_match($tagPattern, $html, $tag, PREG_OFFSET_CAPTURE | PREG_UNMATCHED_AS_NULL, $offset)) === 1) {
             $offset = $tag[0][1] + strlen((string)$tag[0][0]);
             // Start tags by name, end tags as `/name`.
-            $tagName = strtolower($tag[2][0] ?? (isset($tag[4][0]) ? '/' . $tag[4][0] : ''));
+            $tagName = strtolower($tag[1][0] ?? (isset($tag[3][0]) ? '/' . $tag[3][0] : ''));
             if ($tagName === 'template' || $tagName === '/template') {
                 $templateDepth = max(0, $templateDepth + ($tagName === 'template' ? 1 : -1));
                 continue;
@@ -269,7 +272,7 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
                 case 'form':
                     // Like the browser, ignore a form inside a form.
                     if ($openForm === null) {
-                        $forms[] = [$this->parseAttributes((string)$tag[3][0])['id'] ?? '', null, false];
+                        $forms[] = [$this->parseAttributes((string)$tag[2][0])['id'] ?? '', null, false];
                         $openForm = array_key_last($forms);
                     }
                     break;
@@ -280,7 +283,11 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
                     }
                     break;
                 case 'fieldset':
-                    $fieldsets[] = [isset($this->parseAttributes((string)$tag[3][0])['disabled']), 0, []];
+                    $fieldsets[] = [isset($this->parseAttributes((string)$tag[2][0])['disabled']), 0, []];
+                    break;
+                case 'datalist':
+                case '/datalist':
+                    $datalistDepth = max(0, $datalistDepth + ($tagName === 'datalist' ? 1 : -1));
                     break;
                 case '/legend':
                     if ($innermostFieldset !== null && $fieldsets[$innermostFieldset][1] === 1) {
@@ -292,9 +299,9 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
                 case 'button':
                 case 'textarea':
                     // Unparsable controls are neither signed nor free, so their submission is rejected.
-                    $attributes = $this->parseAttributes((string)$tag[3][0]);
+                    $attributes = $this->parseAttributes((string)$tag[2][0]);
                     // The browser does not submit a disabled field.
-                    if (str_starts_with($attributes['name'] ?? '', '_s[') && !isset($attributes['disabled']) && !$this->isDisabledByFieldset($fieldsets)) {
+                    if (str_starts_with($attributes['name'] ?? '', '_s[') && !isset($attributes['disabled']) && $datalistDepth === 0 && !$this->isDisabledByFieldset($fieldsets)) {
                         $controls[] = [$openForm, $tagName, $attributes, $tag[0][1]];
                     }
             }
@@ -328,7 +335,7 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
             } elseif (in_array($name, $openElements, true)) {
                 return [$disabled, 2, []];
             }
-        } elseif ($tagName !== '' && $tagName !== 'textarea' && !in_array($tagName, self::VOID_ELEMENTS, true)) {
+        } elseif ($tagName !== '' && !in_array($tagName, [...self::RAW_TEXT_ELEMENTS, ...self::VOID_ELEMENTS], true)) {
             $openElements[] = $tagName;
         }
 
