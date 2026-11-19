@@ -85,6 +85,8 @@
 </form>
 <template><template></template><input type="text" name="tx_solr[filter]" value="" form="templated"></template>
 <template><form id="templated"></form></template>
+<fieldset disabled><form id="disabled-form" action="/search" method="get"></form></fieldset>
+<input type="text" name="tx_solr[q]" value="" form="disabled-form">
 <form id="fieldset" action="/search" method="get">
     <input type="text" name="tx_solr[q]" value="">
 </form>

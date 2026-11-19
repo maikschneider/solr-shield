@@ -25,7 +25,7 @@ final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCa
     {
         $html = (string)$this->request('/form')->getBody();
 
-        self::assertSame(14, substr_count($html, 'name="_ss"'));
+        self::assertSame(15, substr_count($html, 'name="_ss"'));
         self::assertMatchesRegularExpression('#<form id="search".*name="_ss".*</form>#s', explode('<form id="newsletter"', $html)[0]);
     }
 
@@ -87,6 +87,18 @@ final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCa
         self::assertSame(
             ['params' => [], 'freeFields' => ['[q]']],
             $this->get(TokenService::class)->decode($this->formSs('commented'))
+        );
+    }
+
+    #[Test]
+    public function tokenOfAFormInADisabledFieldsetIsSubmittedWithItsLinkedFields(): void
+    {
+        $html = (string)$this->request('/form')->getBody();
+
+        self::assertSame(1, preg_match('#<form id="disabled-form" action="/search" method="get"></form></fieldset>\s*<input type="hidden" name="_ss" value="([^"]+)" form="disabled-form"><input type="text" name="_s\[q\]" value="" form="disabled-form">#', $html, $matches), $html);
+        self::assertSame(
+            ['params' => [], 'freeFields' => ['[q]']],
+            $this->get(TokenService::class)->decode(html_entity_decode($matches[1] ?? '', ENT_QUOTES))
         );
     }
 

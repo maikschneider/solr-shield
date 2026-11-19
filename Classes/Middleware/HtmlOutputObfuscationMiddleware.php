@@ -182,18 +182,34 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
         // Like the browser, a control with a `form` attribute belongs to the
         // form with that id, or to no form if there is none, wherever it sits.
         $controlsByForm = [];
-        foreach ($controls as [$parentForm, $tagName, $attributes]) {
+        $firstControlByForm = [];
+        foreach ($controls as [$parentForm, $tagName, $attributes, $offset]) {
             $owner = isset($attributes['form']) ? $formIndexById[$attributes['form']] ?? null : $parentForm;
             if ($owner !== null && $forms[$owner][1] !== null) {
                 $controlsByForm[$owner][] = [$tagName, $attributes];
+                $firstControlByForm[$owner] ??= [$offset, $attributes['form'] ?? null];
             }
         }
 
-        // Insert from the last form backwards, so the offsets of earlier forms stay valid.
-        krsort($controlsByForm);
+        $hiddenFields = [];
         foreach ($controlsByForm as $index => $formControls) {
-            $hiddenField = '<input type="hidden" name="_ss" value="' . htmlspecialchars($this->signForm($formControls), ENT_QUOTES) . '">';
-            $html = substr_replace($html, $hiddenField, (int)$forms[$index][1], 0);
+            $hiddenField = '<input type="hidden" name="_ss" value="' . htmlspecialchars($this->signForm($formControls), ENT_QUOTES) . '"';
+            [, $endOffset, $endDisabled] = $forms[$index];
+            if ($endDisabled) {
+                // The end tag sits in a disabled fieldset, which would disable the
+                // token. In front of the first control, with its `form` attribute,
+                // it is enabled and belongs to the same form.
+                [$offset, $formAttribute] = $firstControlByForm[$index];
+                $hiddenFields[$offset] = $hiddenField . ($formAttribute !== null ? ' form="' . htmlspecialchars($formAttribute, ENT_QUOTES) . '"' : '') . '>';
+            } else {
+                $hiddenFields[(int)$endOffset] = $hiddenField . '>';
+            }
+        }
+
+        // Insert from the end backwards, so the earlier offsets stay valid.
+        krsort($hiddenFields);
+        foreach ($hiddenFields as $offset => $hiddenField) {
+            $html = substr_replace($html, $hiddenField, $offset, 0);
         }
 
         return $html;
@@ -202,9 +218,10 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
     /**
      * All forms and enabled `_s[…]` controls of the document, in document order.
      *
-     * @return array{list<array{string, ?int}>, list<array{?int, string, array<string, string>}>}
-     *     forms with id and offset of their end tag (null if unclosed), and
-     *     controls with their enclosing form, lowercase tag name and attributes
+     * @return array{list<array{string, ?int, bool}>, list<array{?int, string, array<string, string>, int}>}
+     *     forms with id, offset of their end tag (null if unclosed) and whether
+     *     that end tag sits in a disabled fieldset, and controls with their
+     *     enclosing form, lowercase tag name, attributes and offset
      */
     private function findFormsAndControls(string $html): array
     {
@@ -256,13 +273,13 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
                 case 'form':
                     // Like the browser, ignore a form inside a form.
                     if ($openForm === null) {
-                        $forms[] = [$this->parseAttributes((string)$tag[3][0])['id'] ?? '', null];
+                        $forms[] = [$this->parseAttributes((string)$tag[3][0])['id'] ?? '', null, false];
                         $openForm = array_key_last($forms);
                     }
                     break;
                 case '/form':
                     if ($openForm !== null) {
-                        $forms[$openForm] = [$forms[$openForm][0], $tag[0][1]];
+                        $forms[$openForm] = [$forms[$openForm][0], $tag[0][1], $this->isDisabledByFieldset($fieldsets)];
                         $openForm = null;
                     }
                     break;
@@ -282,7 +299,7 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
                     $attributes = $this->parseAttributes((string)$tag[3][0]);
                     // The browser does not submit a disabled field.
                     if (str_starts_with($attributes['name'] ?? '', '_s[') && !isset($attributes['disabled']) && !$this->isDisabledByFieldset($fieldsets)) {
-                        $controls[] = [$openForm, $tagName, $attributes];
+                        $controls[] = [$openForm, $tagName, $attributes, $tag[0][1]];
                     }
             }
         }
