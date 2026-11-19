@@ -209,12 +209,21 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
         // Every tag is consumed whole, so tag-like text inside an attribute
         // value, a comment, a script, a style or a textarea never counts as a tag.
         // A tag name ends at whitespace, `/` or `>`, so `<textarea-wrapper>` is no textarea.
-        preg_match_all(
-            '/<!--.*?-->|<(script|style)(?=[\t\n\f\r \/>]).*?<\/\1\s*>|(?|<(textarea)(?=[\t\n\f\r \/>])((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>.*?<\/textarea\s*>|<([a-z][^\t\n\f\r \/>]*)((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>)|<\/([a-z][^\t\n\f\r \/>]*)[^>]*>/is',
+        // Possessive loops keep large inline content within PCRE's backtrack limit.
+        $attributePattern = '((?:[^>"\']++|"[^"]*+"|\'[^\']*+\')*+)';
+        $found = preg_match_all(
+            '/<!--[^-]*+(?:-(?!->)[^-]*+)*+-->'
+            . '|<(script|style)(?=[\t\n\f\r \/>])[^<]*+(?:<(?!\/\1\s*>)[^<]*+)*+<\/\1\s*>'
+            . '|(?|<(textarea)(?=[\t\n\f\r \/>])' . $attributePattern . '>[^<]*+(?:<(?!\/textarea\s*>)[^<]*+)*+<\/textarea\s*>'
+            . '|<([a-z][^\t\n\f\r \/>]*+)' . $attributePattern . '>)'
+            . '|<\/([a-z][^\t\n\f\r \/>]*+)[^>]*+>/is',
             $html,
             $tags,
             PREG_SET_ORDER | PREG_OFFSET_CAPTURE | PREG_UNMATCHED_AS_NULL
         );
+        if ($found === false) {
+            throw new \RuntimeException('Could not find the forms to sign: ' . preg_last_error_msg(), 1795110108);
+        }
         $forms = [];
         $controls = [];
         $openForm = null;

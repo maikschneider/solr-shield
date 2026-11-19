@@ -90,6 +90,14 @@ final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCa
         );
     }
 
+    #[Test]
+    public function largeInlineContentDoesNotPreventSigning(): void
+    {
+        $html = (string)$this->request('/large-form')->getBody();
+
+        self::assertStringContainsString('<input type="text" name="_s[q]"><input type="hidden" name="_ss" value="', $html);
+    }
+
     /**
      * @return array<string, array{string, array<string, mixed>}>
      */
