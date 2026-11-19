@@ -52,16 +52,25 @@
     ts: Date.now(),
   }));
 
+  // A field may be linked to its form through the `form` attribute from
+  // outside, e.g. the token of a form inside a disabled fieldset.
+  const formField = (form, name) => Array.from(form.elements).find((element) => element.name === name);
+
   const signForm = (form) => {
-    if (!(form instanceof HTMLFormElement) || !form.querySelector('input[name="_ss"]')) {
+    const token = form instanceof HTMLFormElement ? formField(form, '_ss') : undefined;
+    if (!token) {
       return;
     }
-    let field = form.querySelector('input[name="_solr_bot"]');
+    let field = formField(form, '_solr_bot');
     if (!field) {
       field = document.createElement('input');
       field.type = 'hidden';
       field.name = '_solr_bot';
-      form.appendChild(field);
+      // Next to the token, it is submitted whenever the token is.
+      if (token.hasAttribute('form')) {
+        field.setAttribute('form', token.getAttribute('form'));
+      }
+      token.after(field);
     }
     field.value = payload();
   };
