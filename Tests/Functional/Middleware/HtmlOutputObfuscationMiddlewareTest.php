@@ -25,7 +25,7 @@ final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCa
     {
         $html = (string)$this->request('/form')->getBody();
 
-        self::assertSame(5, substr_count($html, 'name="_ss"'));
+        self::assertSame(6, substr_count($html, 'name="_ss"'));
         self::assertMatchesRegularExpression('#<form id="search".*name="_ss".*</form>#s', explode('<form id="newsletter"', $html)[0]);
     }
 

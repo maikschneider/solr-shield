@@ -77,6 +77,18 @@ final class PayloadIntegrityTest extends AbstractMiddlewareTestCase
     }
 
     #[Test]
+    public function markupInsideATextareaIsNoControl(): void
+    {
+        $ss = rawurlencode($this->formSs('textarea'));
+
+        self::assertSame(
+            ['tx_solr' => ['q' => '<input name="x">', 'filter' => ['type:pages']]],
+            $this->echoed($this->request('/search?_s%5Bq%5D=%3Cinput%20name%3D%22x%22%3E&_s%5Bfilter%5D%5B0%5D=type%3Apages&_ss=' . $ss))['query']
+        );
+        $this->assertForbidden($this->request('/search?_s%5Bq%5D=foo&_s%5Bfilter%5D%5B0%5D=type%3Apages&_s%5Bfilter%5D%5B1%5D=type%3Anews&_ss=' . $ss));
+    }
+
+    #[Test]
     public function suggestAcceptsOnlyTheTypedQueryAsRawParameter(): void
     {
         $ss = rawurlencode($this->signedPayload(''));

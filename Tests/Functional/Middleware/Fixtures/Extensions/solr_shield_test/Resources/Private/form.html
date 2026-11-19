@@ -29,6 +29,10 @@
     <input type="checkbox" name="tx_solr[filter][1]" value="author:joe" disabled>
     <input type="text" name="tx_solr[q]" value="">
 </form>
+<form id="textarea" action="/search" method="get">
+    <input type="hidden" name="tx_solr[filter][0]" value="type:pages">
+    <textarea name="tx_solr[q]"><input type="text" name="tx_solr[filter][1]"></textarea>
+</form>
 <form id="fallback" action="/search" method="get">
     <input type="hidden" name="tx_solr[filter][0]" value="">
     <input type="checkbox" name="tx_solr[filter][0]" value="type:news">

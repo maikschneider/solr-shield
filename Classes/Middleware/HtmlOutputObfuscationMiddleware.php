@@ -188,9 +188,9 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
         $fixed = [];
         $free = [];
         // Every tag is consumed whole, so tag-like text inside an attribute
-        // value, a comment, a script or a style never counts as a control.
+        // value, a comment, a script, a style or a textarea never counts as a control.
         preg_match_all(
-            '/<!--.*?-->|<(script|style)\b.*?<\/\1\s*>|<(input|select|textarea|button)\b((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>|<[a-z](?:[^>"\']|"[^"]*"|\'[^\']*\')*>/is',
+            '/<!--.*?-->|<(script|style)\b.*?<\/\1\s*>|(?|<(textarea)\b((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>.*?<\/textarea\s*>|<(input|select|button)\b((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>)|<[a-z](?:[^>"\']|"[^"]*"|\'[^\']*\')*>/is',
             $form,
             $tags,
             PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL
