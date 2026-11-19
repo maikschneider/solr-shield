@@ -50,5 +50,24 @@
     <input type="hidden" name="tx_solr[filter][0]" value="">
     <input type="checkbox" name="tx_solr[filter][0]" value="type:news">
 </form>
+<input type="hidden" name="tx_solr[filter][]" value="lang:en" form="ordered">
+<form id="attached" action="/search" method="get">
+    <input type="text" name="tx_solr[q]" value="">
+    <input type="hidden" name="tx_solr[filter][]" value="type:news" form="ordered">
+    <input type="hidden" name="tx_solr[filter][]" value="type:news" form="nowhere">
+    <input type="text" name="tx_solr[sort]" value="" form="">
+    <input type="text" name="tx_solr[page]" value="" form="not-a-form">
+</form>
+<input type="hidden" name="tx_solr[filter][]" form="attached">
+<!-- <input type="hidden" name="tx_solr[filter][]" value="type:news" form="attached"> -->
+<input type="hidden" name="tx_solr[filter][]" value="type:news" form="attached" disabled>
+<script>const note = '<input type="text" name="tx_solr[resultsPerPage]" form="attached">';</script>
+<input-group type="hidden" name="tx_solr[filter][]" value="type:news" form="attached"></input-group>
+<div id="not-a-form"></div>
+<form id="ordered" action="/search" method="get">
+    <input type="hidden" name="tx_solr[filter][]" value="type:pages">
+</form>
+<input type="hidden" name="tx_solr[filter][]" value="year:2026" form="ordered">
+<select name="tx_solr[filter][]" form="ordered"><option value="author:jane">Jane</option></select>
 </body>
 </html>

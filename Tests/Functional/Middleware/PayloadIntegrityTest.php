@@ -102,6 +102,38 @@ final class PayloadIntegrityTest extends AbstractMiddlewareTestCase
     }
 
     #[Test]
+    public function fieldsLinkedThroughTheFormAttributeAreSigned(): void
+    {
+        $ss = rawurlencode($this->formSs('attached'));
+
+        self::assertSame(
+            ['tx_solr' => ['q' => 'foo', 'filter' => ['']]],
+            $this->echoed($this->request('/search?_s%5Bq%5D=foo&_s%5Bfilter%5D%5B%5D=&_ss=' . $ss))['query']
+        );
+        $this->assertForbidden($this->request('/search?_s%5Bq%5D=foo&_s%5Bfilter%5D%5B%5D=type%3Anews&_ss=' . $ss));
+        $this->assertForbidden($this->request('/search?_s%5Bq%5D=foo&_s%5Bfilter%5D%5B%5D=&_s%5Bsort%5D=title&_ss=' . $ss));
+    }
+
+    #[Test]
+    public function fieldsBelongToTheFormTheirFormAttributeNames(): void
+    {
+        $data = json_decode((string)base64_decode($this->formSs('attached'), true), true);
+
+        self::assertSame(['p' => 'tx_solr%5Bfilter%5D%5B%5D=', 'f' => ['[q]']], array_diff_key((array)$data, ['s' => true]));
+    }
+
+    #[Test]
+    public function fieldsLinkedThroughTheFormAttributeKeepTheDocumentOrder(): void
+    {
+        $ss = rawurlencode($this->formSs('ordered'));
+        $filters = ['lang:en', 'type:news', 'type:pages', 'year:2026', 'author:jane'];
+        $query = implode('&', array_map(static fn (string $filter): string => '_s%5Bfilter%5D%5B%5D=' . rawurlencode($filter), $filters));
+
+        self::assertSame(['tx_solr' => ['filter' => $filters]], $this->echoed($this->request('/search?' . $query . '&_ss=' . $ss))['query']);
+        $this->assertForbidden($this->request('/search?_s%5Bfilter%5D%5B%5D=type%3Anews&_s%5Bfilter%5D%5B%5D=lang%3Aen&_ss=' . $ss));
+    }
+
+    #[Test]
     public function suggestAcceptsOnlyTheTypedQueryAsRawParameter(): void
     {
         $ss = rawurlencode($this->signedPayload(''));
@@ -138,15 +170,5 @@ final class PayloadIntegrityTest extends AbstractMiddlewareTestCase
         $data['p'] = $query;
 
         return base64_encode((string)json_encode($data));
-    }
-
-    private function formSs(string $formId): string
-    {
-        $html = (string)$this->request('/form')->getBody();
-        preg_match('#<form id="' . $formId . '".*?name="_ss" value="([^"]+)"#s', $html, $matches);
-        $value = $matches[1] ?? '';
-        self::assertNotSame('', $value, $html);
-
-        return html_entity_decode($value, ENT_QUOTES);
     }
 }

@@ -160,55 +160,97 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
     }
 
     /**
-     * Inject a hidden `_ss` field into every form that carries `_s[` fields.
+     * Inject a hidden `_ss` field into every form that owns `_s[` fields,
+     * including fields linked to it through the `form` attribute.
      * Its payload signs the values of the form's hidden `_s[…]` fields and the
      * names of the fields the visitor fills in, so a submission can neither
      * change a hidden value nor add a field the form does not have.
      */
     private function injectSsTokenIntoForms(string $html): string
     {
-        $result = preg_replace_callback(
-            '/<form\b[^>]*>.*?<\/form>/si',
-            function (array $matches): string {
-                $form = $matches[0];
-                if (!str_contains($form, 'name="_s[') && !str_contains($form, "name='_s[")) {
-                    return $form;
-                }
-                $hiddenField = '<input type="hidden" name="_ss" value="' . htmlspecialchars($this->signForm($form), ENT_QUOTES) . '">';
-                return substr_replace($form, $hiddenField, (int)strripos($form, '</form>'), 0);
-            },
-            $html
-        );
+        if (preg_match_all('/<form\b([^>]*)>.*?<\/form>/si', $html, $forms, PREG_SET_ORDER | PREG_OFFSET_CAPTURE) === 0) {
+            return $html;
+        }
 
-        return $result ?? $html;
+        $formIndexById = [];
+        foreach ($forms as $index => $form) {
+            $id = $this->parseAttributes($form[1][0])['id'] ?? '';
+            if ($id !== '') {
+                $formIndexById[$id] ??= $index;
+            }
+        }
+
+        // Like the browser, a control with a `form` attribute belongs to the
+        // form with that id, or to no form if there is none, wherever it sits.
+        $controlsByForm = [];
+        $formIndex = 0;
+        foreach ($this->findControls($html) as [$offset, $tagName, $attributes]) {
+            if (isset($attributes['form'])) {
+                $owner = $formIndexById[$attributes['form']] ?? null;
+            } else {
+                while (isset($forms[$formIndex]) && $forms[$formIndex][0][1] + strlen($forms[$formIndex][0][0]) <= $offset) {
+                    $formIndex++;
+                }
+                $owner = isset($forms[$formIndex]) && $forms[$formIndex][0][1] < $offset ? $formIndex : null;
+            }
+            if ($owner !== null) {
+                $controlsByForm[$owner][] = [$tagName, $attributes];
+            }
+        }
+
+        // Insert from the last form backwards, so the offsets of earlier forms stay valid.
+        krsort($controlsByForm);
+        foreach ($controlsByForm as $index => $controls) {
+            [$form, $offset] = $forms[$index][0];
+            $hiddenField = '<input type="hidden" name="_ss" value="' . htmlspecialchars($this->signForm($controls), ENT_QUOTES) . '">';
+            $html = substr_replace($html, $hiddenField, $offset + (int)strripos($form, '</form>'), 0);
+        }
+
+        return $html;
     }
 
-    private function signForm(string $form): string
+    /**
+     * All enabled `_s[…]` controls of the document, in document order.
+     *
+     * @return list<array{int, string, array<string, string>}> offset, lowercase tag name and attributes
+     */
+    private function findControls(string $html): array
     {
-        $fixed = [];
-        $free = [];
         // Every tag is consumed whole, so tag-like text inside an attribute
         // value, a comment, a script, a style or a textarea never counts as a control.
         // A tag name ends at whitespace, `/` or `>`, so `<textarea-wrapper>` is no textarea.
         preg_match_all(
             '/<!--.*?-->|<(script|style)(?=[\t\n\f\r \/>]).*?<\/\1\s*>|(?|<(textarea)(?=[\t\n\f\r \/>])((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>.*?<\/textarea\s*>|<(input|select|button)(?=[\t\n\f\r \/>])((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>)|<[a-z](?:[^>"\']|"[^"]*"|\'[^\']*\')*>/is',
-            $form,
+            $html,
             $tags,
-            PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL
+            PREG_SET_ORDER | PREG_OFFSET_CAPTURE | PREG_UNMATCHED_AS_NULL
         );
+        $controls = [];
         foreach ($tags as $tag) {
-            if ($tag[2] === null) {
+            if ($tag[2][0] === null) {
                 continue;
             }
             // Unparsable controls are neither signed nor free, so their submission is rejected.
-            $attributes = $this->parseAttributes((string)$tag[3]);
-            $name = $attributes['name'] ?? '';
+            $attributes = $this->parseAttributes((string)$tag[3][0]);
             // The browser does not submit a disabled field.
-            if (!str_starts_with($name, '_s[') || isset($attributes['disabled'])) {
-                continue;
+            if (str_starts_with($attributes['name'] ?? '', '_s[') && !isset($attributes['disabled'])) {
+                $controls[] = [$tag[0][1], strtolower($tag[2][0]), $attributes];
             }
-            $path = substr($name, 2);
-            if (strtolower($tag[2]) === 'input' && strtolower($attributes['type'] ?? '') === 'hidden') {
+        }
+
+        return $controls;
+    }
+
+    /**
+     * @param list<array{string, array<string, string>}> $controls lowercase tag name and attributes
+     */
+    private function signForm(array $controls): string
+    {
+        $fixed = [];
+        $free = [];
+        foreach ($controls as [$tagName, $attributes]) {
+            $path = substr($attributes['name'], 2);
+            if ($tagName === 'input' && strtolower($attributes['type'] ?? '') === 'hidden') {
                 $fixed[] = [$path, $attributes['value'] ?? ''];
             } else {
                 $free[$path] = $path;

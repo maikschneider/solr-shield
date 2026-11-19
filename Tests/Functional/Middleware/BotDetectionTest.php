@@ -78,6 +78,18 @@ final class BotDetectionTest extends AbstractMiddlewareTestCase
     }
 
     #[Test]
+    public function formWithFieldsLinkedThroughTheFormAttributePasses(): void
+    {
+        $uri = '/search?_s%5Bq%5D=foo&_s%5Bfilter%5D%5B%5D=&_ss=' . rawurlencode($this->formSs('attached'));
+
+        self::assertSame(
+            ['tx_solr' => ['q' => 'foo', 'filter' => ['']]],
+            $this->echoed($this->request($uri . '&_solr_bot=' . rawurlencode(self::botPayload())))['query']
+        );
+        $this->assertForbidden($this->request($uri));
+    }
+
+    #[Test]
     public function formSubmissionPrefersThePayloadInTheBodyOverTheOneInTheUrl(): void
     {
         $echoed = $this->echoed($this->request($this->signedUri('tx_solr%5Bq%5D=bar', self::botPayload(['webdriver' => true])), [

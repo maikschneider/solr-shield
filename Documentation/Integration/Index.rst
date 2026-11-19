@@ -42,6 +42,15 @@ HTML to ``_s[…]`` and adds the signed ``_ss`` field to their form (see
     their ``tx_solr[…]`` name, and the request is rejected. Render the
     fields on the server and show or hide them instead.
 *   A form that only gets Solr fields through JavaScript has no ``_ss``.
+*   Fields outside the form, for example a facet in a sidebar, are signed for
+    the form whose ``id`` their ``form`` attribute names:
+
+    ..  code-block:: html
+
+        <form id="tx-solr-search-form-pi-results" action="/search">
+            <input type="text" name="tx_solr[q]">
+        </form>
+        <input type="hidden" name="tx_solr[filter][]" form="tx-solr-search-form-pi-results">
 
 ..  _integration-autocomplete:
 
