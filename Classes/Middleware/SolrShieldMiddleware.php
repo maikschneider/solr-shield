@@ -57,7 +57,7 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
                 $raw = $this->extractParam($queryParams, $parsedBody, '_ss');
                 $decoded = $this->validateAndDecode($raw);
                 if ($decoded === null) {
-                    return $this->reject($request, $settings['uriObfuscation']['rejectAction']);
+                    return $this->reject($request, $settings['uriObfuscation']['rejectAction'], $isSuggestRequest);
                 }
                 // Suggest requests carry the typed tx_solr[queryString] next to
                 // the signed additionalFilters, so the payload is merged into
@@ -65,23 +65,25 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
                 $request = $this->injectDecodedParams($request, $decoded, $isSuggestRequest);
             } elseif ($hasTxSolr || $isSuggestRequest) {
                 // Direct tx_solr request or suggest without signed payload → reject
-                return $this->reject($request, $settings['uriObfuscation']['rejectAction']);
+                return $this->reject($request, $settings['uriObfuscation']['rejectAction'], $isSuggestRequest);
             }
         }
 
         // --- Protection 2: Bot Detection ---
-        if ($settings['botDetection']['enabled'] && !$isSuggestRequest && $hasSs) {
+        if ($settings['botDetection']['enabled'] && $hasSs) {
             // A form posted to a URL that came from a signed link carries that
             // link's older payload in the query; the one in the body is fresh.
             $botPayload = $this->extractParam([], $parsedBody, '_solr_bot');
             if ($botPayload === '') {
                 $botPayload = $this->extractParam($queryParams, null, '_solr_bot');
             }
-            if ($botPayload === '') {
-                return $this->reject($request, $settings['uriObfuscation']['rejectAction']);
+            $botSettings = $settings['botDetection'];
+            if ($isSuggestRequest) {
+                // Visitors often start typing right after the page has loaded.
+                $botSettings['minFormTimeout'] = 0;
             }
-            if (!$this->botDetectionService->isHuman($botPayload, $settings['botDetection'])) {
-                return $this->reject($request, $settings['uriObfuscation']['rejectAction']);
+            if ($botPayload === '' || !$this->botDetectionService->isHuman($botPayload, $botSettings)) {
+                return $this->reject($request, $settings['uriObfuscation']['rejectAction'], $isSuggestRequest);
             }
             $request = $this->stripParams($request, ['_solr_bot']);
         }
@@ -201,9 +203,12 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
         return $decoded !== [] ? $decoded : [];
     }
 
-    private function reject(ServerRequestInterface $request, string $action): ResponseInterface
+    /**
+     * Suggest requests come from a script that expects JSON, so they are never redirected.
+     */
+    private function reject(ServerRequestInterface $request, string $action, bool $isSuggestRequest): ResponseInterface
     {
-        if ($action === '403') {
+        if ($action === '403' || $isSuggestRequest) {
             return $this->responseFactory->createResponse(403);
         }
 

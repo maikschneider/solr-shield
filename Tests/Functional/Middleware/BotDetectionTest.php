@@ -89,12 +89,41 @@ final class BotDetectionTest extends AbstractMiddlewareTestCase
         self::assertSame(['tx_solr' => ['q' => 'foo']], $echoed['body']);
     }
 
-    #[Test]
-    public function signedSuggestRequestNeedsNoPayload(): void
+    private function suggestUri(?string $botPayload): string
     {
-        $response = $this->request('/?type=7384&tx_solr%5BqueryString%5D=fo&_ss=' . rawurlencode($this->signedPayload('')));
+        $uri = '/?type=7384&tx_solr%5BqueryString%5D=fo&_ss=' . rawurlencode($this->signedPayload(''));
 
-        self::assertSame(200, $response->getStatusCode());
+        return $botPayload === null ? $uri : $uri . '&_solr_bot=' . rawurlencode($botPayload);
+    }
+
+    #[Test]
+    public function suggestRequestWithHumanPayloadPassesWithoutTheBotParameter(): void
+    {
+        $query = $this->echoed($this->request($this->suggestUri(self::botPayload())))['query'];
+
+        self::assertSame(['type' => '7384', 'tx_solr' => ['queryString' => 'fo']], $query);
+    }
+
+    #[Test]
+    public function suggestRequestWithoutPayloadIsRejected(): void
+    {
+        $this->assertForbidden($this->request($this->suggestUri(null)));
+    }
+
+    #[Test]
+    public function suggestRequestWithBotPayloadIsRejected(): void
+    {
+        $this->assertForbidden($this->request($this->suggestUri(self::botPayload(['webdriver' => true]))));
+    }
+
+    #[Test]
+    public function suggestRequestSkipsTheMinimumFormTimeout(): void
+    {
+        // Passes exactly securityLevel (7) checks only if the timeout check is skipped.
+        $payload = self::botPayload(['elapsed' => 0, 'mouseMoveCount' => 0, 'scrollCount' => 0, 'viewportHeight' => 0]);
+
+        self::assertSame(200, $this->request($this->suggestUri($payload))->getStatusCode());
+        $this->assertForbidden($this->request($this->signedUri('tx_solr%5Bq%5D=foo', $payload)));
     }
 
     #[Test]

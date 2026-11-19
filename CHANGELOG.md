@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Bot detection covers autocomplete requests.** Suggest requests (`type=7384`) without a valid `_solr_bot` are rejected; they skip the `minFormTimeout` check. `solr-shield.js` adds the payload to same-origin `XMLHttpRequest` and `fetch()` calls for suggest URLs and for URLs that carry `_ss`, so EXT:solr's suggest controllers and AJAX-loaded result URLs work without changes. Rejected suggest requests always get an empty `403`, also with `rejectAction: redirect` ([#23](https://github.com/maikschneider/solr-shield/issues/23)).
+
 ### Fixed
 
 - **Turbo Drive and similar SPA navigation.** `solr-shield.js` sets itself up once per document instead of on every visit, Turbo's hover prefetch is cancelled for `_ss` links, and the patched TYPO3 14 range facet scripts work on pages reached through a visit ([#21](https://github.com/maikschneider/solr-shield/issues/21)).

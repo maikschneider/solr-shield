@@ -51,7 +51,15 @@ Autocomplete
 Keep EXT:solr's ``data-suggest`` attribute on the search form. Its URL gets
 a signed ``_ss`` on the server, and a suggest request (``type=7384``)
 without one is rejected. Suggest requests accept the typed
-``tx_solr[queryString]`` as it is and are not scored by bot detection.
+``tx_solr[queryString]`` as it is.
+
+With :confval:`setting-botDetection-enabled`, suggest requests are scored
+like searches. ``solr-shield.js`` adds ``_solr_bot`` when the autocomplete
+script sends the request through ``XMLHttpRequest`` or ``fetch()``, so
+EXT:solr's suggest controllers and custom autocomplete scripts need no
+changes. Load the request URL from ``data-suggest`` at request time or
+store it once, both work: the payload is added to the request, not to the
+attribute.
 
 ..  _integration-javascript:
 
@@ -70,10 +78,13 @@ needs care:
 *   Never build ``tx_solr`` parameters in the browser. Take the URL from a
     link or data attribute rendered on the server, so it already carries
     ``_ss``, and keep that parameter.
-*   ``window.location``, ``fetch()``, XHR and infinite scroll bypass
-    ``solr-shield.js``. With :confval:`setting-botDetection-enabled`, such a
-    request has no ``_solr_bot`` and is rejected. Navigate through a link
-    click instead:
+*   ``fetch()`` and ``XMLHttpRequest`` calls to a same-origin URL that
+    carries ``_ss`` get a fresh ``_solr_bot`` from ``solr-shield.js``, so
+    loading a signed result URL via AJAX (for example ``$.ajax`` for a map
+    of the results) works. Requests to other origins are left alone.
+*   ``window.location`` assignments bypass ``solr-shield.js``. With
+    :confval:`setting-botDetection-enabled`, such a request has no
+    ``_solr_bot`` and is rejected. Navigate through a link click instead:
 
     ..  code-block:: javascript
 
@@ -85,9 +96,6 @@ needs care:
           link.click();
           link.remove();
         }
-
-    For a request that must not navigate, trigger it from the click handler
-    of a rendered link and use that link's ``href``.
 
 ..  _integration-placeholders:
 

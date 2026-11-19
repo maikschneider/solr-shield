@@ -54,6 +54,15 @@ final class RejectWithRedirectTest extends AbstractMiddlewareTestCase
     }
 
     #[Test]
+    public function rejectedSuggestRequestIsNotRedirected(): void
+    {
+        $response = $this->request('/?type=7384&tx_solr%5BqueryString%5D=fo', null, ['Referer' => 'http://localhost/previous']);
+
+        $this->assertForbidden($response);
+        self::assertSame('', (string)$response->getBody());
+    }
+
+    #[Test]
     public function signedRequestStillPasses(): void
     {
         $query = $this->echoed($this->request('/search?_ss=' . rawurlencode($this->signedPayload('tx_solr%5Bq%5D=foo'))))['query'];

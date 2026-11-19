@@ -19,6 +19,7 @@ Tests use the TYPO3 Testing Framework and PHPUnit.
 ```bash
 ddev exec vendor/bin/phpunit --testsuite Unit
 ddev exec vendor/bin/phpunit --testsuite Functional
+ddev exec node --test Tests/JavaScript/*.test.mjs
 ```
 
 ## Code Quality Standards

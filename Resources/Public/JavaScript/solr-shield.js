@@ -5,7 +5,8 @@
 // `_ss` field, or following a link whose URL carries `_ss`. The server scores
 // the payload (BotDetectionService) and rejects requests without one.
 //
-// Autocomplete requests are exempt on the server, so they need nothing here.
+// Autocomplete requests and AJAX requests to `_ss` URLs get the payload when
+// a script opens them, see signRequestUrl().
 (() => {
   'use strict';
 
@@ -111,4 +112,40 @@
       event.preventDefault();
     }
   });
+
+  // Autocomplete scripts (EXT:solr's suggest controllers or custom ones) and
+  // scripts that load a signed URL via AJAX send their request without any of
+  // the events above. Their same-origin request URLs get a fresh payload.
+  const signRequestUrl = (input) => {
+    let url;
+    try {
+      url = new URL(String(input), window.location.href);
+    } catch {
+      return null;
+    }
+    if (url.origin !== window.location.origin
+      || (url.searchParams.get('type') !== '7384' && !url.searchParams.has('_ss'))
+    ) {
+      return null;
+    }
+    url.searchParams.set('_solr_bot', payload());
+    return url.toString();
+  };
+
+  const nativeOpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function open(method, url, ...rest) {
+    nativeOpen.call(this, method, signRequestUrl(url) ?? url, ...rest);
+  };
+
+  const nativeFetch = window.fetch;
+  if (nativeFetch) {
+    window.fetch = (input, init) => {
+      const isRequest = input instanceof Request;
+      const signed = signRequestUrl(isRequest ? input.url : input);
+      if (signed) {
+        input = isRequest ? new Request(signed, input) : signed;
+      }
+      return nativeFetch.call(window, input, init);
+    };
+  }
 })();
