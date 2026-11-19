@@ -25,7 +25,7 @@ final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCa
     {
         $html = (string)$this->request('/form')->getBody();
 
-        self::assertSame(6, substr_count($html, 'name="_ss"'));
+        self::assertSame(7, substr_count($html, 'name="_ss"'));
         self::assertMatchesRegularExpression('#<form id="search".*name="_ss".*</form>#s', explode('<form id="newsletter"', $html)[0]);
     }
 
@@ -47,6 +47,15 @@ final class HtmlOutputObfuscationMiddlewareTest extends AbstractMiddlewareTestCa
                 'freeFields' => ['[q]'],
             ],
             $this->get(TokenService::class)->decode($this->injectedSs('markup'))
+        );
+    }
+
+    #[Test]
+    public function customElementsAreNoControls(): void
+    {
+        self::assertSame(
+            ['params' => ['tx_solr' => ['filter' => ['type:pages']]], 'freeFields' => ['[q]']],
+            $this->get(TokenService::class)->decode($this->injectedSs('custom-elements'))
         );
     }
 

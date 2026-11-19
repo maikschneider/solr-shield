@@ -89,6 +89,19 @@ final class PayloadIntegrityTest extends AbstractMiddlewareTestCase
     }
 
     #[Test]
+    public function customElementsDoNotHideOrAddControls(): void
+    {
+        $ss = rawurlencode($this->formSs('custom-elements'));
+
+        self::assertSame(
+            ['tx_solr' => ['q' => 'foo', 'filter' => ['type:pages']]],
+            $this->echoed($this->request('/search?_s%5Bq%5D=foo&_s%5Bfilter%5D%5B0%5D=type%3Apages&_ss=' . $ss))['query']
+        );
+        $this->assertForbidden($this->request('/search?_s%5Bq%5D=foo&_s%5Bfilter%5D%5B0%5D=type%3Anews&_ss=' . $ss));
+        $this->assertForbidden($this->request('/search?_s%5Bq%5D=foo&_s%5Bfilter%5D%5B0%5D=type%3Apages&_s%5Bfilter%5D%5B2%5D=type%3Anews&_ss=' . $ss));
+    }
+
+    #[Test]
     public function suggestAcceptsOnlyTheTypedQueryAsRawParameter(): void
     {
         $ss = rawurlencode($this->signedPayload(''));

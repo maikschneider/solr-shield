@@ -189,8 +189,9 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
         $free = [];
         // Every tag is consumed whole, so tag-like text inside an attribute
         // value, a comment, a script, a style or a textarea never counts as a control.
+        // A tag name ends at whitespace, `/` or `>`, so `<textarea-wrapper>` is no textarea.
         preg_match_all(
-            '/<!--.*?-->|<(script|style)\b.*?<\/\1\s*>|(?|<(textarea)\b((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>.*?<\/textarea\s*>|<(input|select|button)\b((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>)|<[a-z](?:[^>"\']|"[^"]*"|\'[^\']*\')*>/is',
+            '/<!--.*?-->|<(script|style)(?=[\t\n\f\r \/>]).*?<\/\1\s*>|(?|<(textarea)(?=[\t\n\f\r \/>])((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>.*?<\/textarea\s*>|<(input|select|button)(?=[\t\n\f\r \/>])((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>)|<[a-z](?:[^>"\']|"[^"]*"|\'[^\']*\')*>/is',
             $form,
             $tags,
             PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL

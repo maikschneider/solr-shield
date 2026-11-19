@@ -33,6 +33,19 @@
     <input type="hidden" name="tx_solr[filter][0]" value="type:pages">
     <textarea name="tx_solr[q]"><input type="text" name="tx_solr[filter][1]"></textarea>
 </form>
+<form id="custom-elements" action="/search" method="get">
+    <script-note></script-note>
+    <style-note></style-note>
+    <textarea-wrapper>
+        <input type="hidden" name="tx_solr[filter][0]" value="type:pages">
+        <textarea name="tx_solr[q]"></textarea>
+    </textarea-wrapper>
+    <input-group type="hidden" name="tx_solr[filter][1]" value="type:news"></input-group>
+    <select-menu name="tx_solr[filter][2]"></select-menu>
+    <button-group name="tx_solr[filter][3]"></button-group>
+    <script>const note = 1;</script>
+    <style>p { color: red; }</style>
+</form>
 <form id="fallback" action="/search" method="get">
     <input type="hidden" name="tx_solr[filter][0]" value="">
     <input type="checkbox" name="tx_solr[filter][0]" value="type:news">
