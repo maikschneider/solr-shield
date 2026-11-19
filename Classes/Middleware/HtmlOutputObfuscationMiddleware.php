@@ -32,6 +32,8 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
 {
     private const RANGE_FACET_SCRIPTS = ['facet_daterange_controller', 'facet_numericrange_controller'];
 
+    private const VOID_ELEMENTS = ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr'];
+
     public function __construct(
         private TokenService $tokenService,
         private StreamFactoryInterface $streamFactory,
@@ -229,8 +231,9 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
         $openForm = null;
         // The content of a template is no part of the document.
         $templateDepth = 0;
-        // Per open fieldset: whether it is disabled, and whether its first
-        // legend, which it does not disable, is not yet seen (0), open (1) or closed (2).
+        // Per open fieldset: whether it is disabled, whether its first legend
+        // child, which it does not disable, is not yet seen (0), open (1) or
+        // closed (2), and the elements open inside it until that legend is seen.
         $fieldsets = [];
         foreach ($tags as $tag) {
             // Start tags by name, end tags as `/name`.
@@ -242,7 +245,13 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
             if ($templateDepth > 0) {
                 continue;
             }
+            if ($tagName === '/fieldset') {
+                array_pop($fieldsets);
+            }
             $innermostFieldset = array_key_last($fieldsets);
+            if ($innermostFieldset !== null && $fieldsets[$innermostFieldset][1] === 0) {
+                $fieldsets[$innermostFieldset] = $this->trackFirstLegendChild($fieldsets[$innermostFieldset], $tagName);
+            }
             switch ($tagName) {
                 case 'form':
                     // Like the browser, ignore a form inside a form.
@@ -258,15 +267,7 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
                     }
                     break;
                 case 'fieldset':
-                    $fieldsets[] = [isset($this->parseAttributes((string)$tag[3][0])['disabled']), 0];
-                    break;
-                case '/fieldset':
-                    array_pop($fieldsets);
-                    break;
-                case 'legend':
-                    if ($innermostFieldset !== null && $fieldsets[$innermostFieldset][1] === 0) {
-                        $fieldsets[$innermostFieldset][1] = 1;
-                    }
+                    $fieldsets[] = [isset($this->parseAttributes((string)$tag[3][0])['disabled']), 0, []];
                     break;
                 case '/legend':
                     if ($innermostFieldset !== null && $fieldsets[$innermostFieldset][1] === 1) {
@@ -290,7 +291,36 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
     }
 
     /**
-     * @param list<array{bool, int}> $fieldsets
+     * Only a legend that is a direct child of the fieldset is its first legend.
+     * Markup that does not nest strictly gives up on the legend, so its
+     * controls stay disabled rather than being signed although the browser
+     * omits them.
+     *
+     * @param array{bool, int, list<string>} $fieldset
+     * @return array{bool, int, list<string>}
+     */
+    private function trackFirstLegendChild(array $fieldset, string $tagName): array
+    {
+        [$disabled, , $openElements] = $fieldset;
+        if ($tagName === 'legend' && $openElements === []) {
+            return [$disabled, 1, []];
+        }
+        if (str_starts_with($tagName, '/')) {
+            $name = substr($tagName, 1);
+            if (end($openElements) === $name) {
+                array_pop($openElements);
+            } elseif (in_array($name, $openElements, true)) {
+                return [$disabled, 2, []];
+            }
+        } elseif ($tagName !== '' && $tagName !== 'textarea' && !in_array($tagName, self::VOID_ELEMENTS, true)) {
+            $openElements[] = $tagName;
+        }
+
+        return [$disabled, 0, $openElements];
+    }
+
+    /**
+     * @param list<array{bool, int, list<string>}> $fieldsets
      */
     private function isDisabledByFieldset(array $fieldsets): bool
     {

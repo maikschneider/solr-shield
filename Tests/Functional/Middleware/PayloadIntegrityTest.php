@@ -148,7 +148,7 @@ final class PayloadIntegrityTest extends AbstractMiddlewareTestCase
     {
         $uri = '/search?_s%5Bq%5D=foo&_ss=' . rawurlencode($this->formSs('fieldset'));
 
-        self::assertSame(['tx_solr' => ['q' => 'foo', 'filter' => ['type:pages', 'year:2026']]], $this->echoed($this->request($uri))['query']);
+        self::assertSame(['tx_solr' => ['q' => 'foo', 'filter' => ['type:pages', 'type:event', 'year:2026']]], $this->echoed($this->request($uri))['query']);
     }
 
     #[Test]
