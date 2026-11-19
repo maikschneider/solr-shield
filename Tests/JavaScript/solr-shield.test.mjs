@@ -7,7 +7,7 @@ const script = readFileSync(new URL('../../Resources/Public/JavaScript/solr-shie
 
 // Runs solr-shield.js against a minimal browser stand-in on https://example.com
 // and records the URLs that reach the native XMLHttpRequest.open() and fetch().
-const load = () => {
+const load = (baseURI = 'https://example.com/news/page') => {
   const opened = [];
   const fetched = [];
   class XMLHttpRequest {
@@ -16,7 +16,7 @@ const load = () => {
     }
   }
   const window = {
-    location: new URL('https://example.com/search?q=bike'),
+    location: new URL('https://example.com/news/page'),
     screen: { width: 1920, height: 1080 },
     innerWidth: 1280,
     innerHeight: 800,
@@ -27,7 +27,7 @@ const load = () => {
   };
   const context = vm.createContext({
     window,
-    document: { addEventListener: () => {} },
+    document: { addEventListener: () => {}, baseURI },
     navigator: { webdriver: false },
     XMLHttpRequest,
     HTMLFormElement: class { submit() {} },
@@ -96,6 +96,25 @@ test('fetch signs string, URL and Request inputs', () => {
   assert.ok(fetched[2].input instanceof Request);
   assert.ok(botParam(fetched[2].input.url));
   assert.equal(fetched[2].input.headers.get('X-Test'), '1');
+});
+
+test('relative URLs resolve against the document base like native requests', () => {
+  const { xhr, window, opened, fetched } = load('https://example.com/');
+
+  xhr().open('GET', 'index.php?type=7384');
+  window.fetch('index.php?_ss=abc');
+
+  assert.equal(new URL(opened[0].url).pathname, '/index.php');
+  assert.equal(new URL(fetched[0].input).pathname, '/index.php');
+});
+
+test('fetch leaves a Request with a body as it is', () => {
+  const { window, fetched } = load();
+  const request = new Request('https://example.com/search?_ss=abc', { method: 'POST', body: 'q=bike', keepalive: true });
+
+  window.fetch(request);
+
+  assert.equal(fetched[0].input, request);
 });
 
 test('fetch to other origins or unrelated URLs stays untouched', () => {

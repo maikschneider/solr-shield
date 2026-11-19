@@ -119,7 +119,7 @@
   const signRequestUrl = (input) => {
     let url;
     try {
-      url = new URL(String(input), window.location.href);
+      url = new URL(String(input), document.baseURI);
     } catch {
       return null;
     }
@@ -141,7 +141,8 @@
   if (nativeFetch) {
     window.fetch = (input, init) => {
       const isRequest = input instanceof Request;
-      const signed = signRequestUrl(isRequest ? input.url : input);
+      // A Request with a body cannot always be copied (keepalive), so it stays as it is.
+      const signed = isRequest && input.body !== null ? null : signRequestUrl(isRequest ? input.url : input);
       if (signed) {
         input = isRequest ? new Request(signed, input) : signed;
       }

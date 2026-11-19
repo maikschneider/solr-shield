@@ -81,7 +81,8 @@ needs care:
 *   ``fetch()`` and ``XMLHttpRequest`` calls to a same-origin URL that
     carries ``_ss`` get a fresh ``_solr_bot`` from ``solr-shield.js``, so
     loading a signed result URL via AJAX (for example ``$.ajax`` for a map
-    of the results) works. Requests to other origins are left alone.
+    of the results) works. Requests to other origins and ``Request`` objects
+    with a body are left alone.
 *   ``window.location`` assignments bypass ``solr-shield.js``. With
     :confval:`setting-botDetection-enabled`, such a request has no
     ``_solr_bot`` and is rejected. Navigate through a link click instead:
