@@ -17,5 +17,16 @@
 <form id="newsletter" action="/newsletter" method="post">
     <input type="email" name="email">
 </form>
+<form id="markup" action="/search" method="get">
+    <INPUT TYPE="HIDDEN" name="tx_solr[filter][0]" value="type:pages">
+    <input type=hidden name="tx_solr[filter][1]" value=author:jane>
+    <input data-note=" type='text'" type="hidden" name="tx_solr[filter][2]" value="year:2026">
+    <input type="hidden" data-note="a>b" name="tx_solr[filter][3]" value="lang:en">
+    <input type="text" name="tx_solr[q]" value="">
+</form>
+<form id="fallback" action="/search" method="get">
+    <input type="hidden" name="tx_solr[filter][0]" value="">
+    <input type="checkbox" name="tx_solr[filter][0]" value="type:news">
+</form>
 </body>
 </html>

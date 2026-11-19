@@ -187,28 +187,59 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
     {
         $fixed = [];
         $free = [];
-        preg_match_all('/<(?:input|select|textarea|button)\b[^>]*>/si', $form, $tags);
-        foreach ($tags[0] as $tag) {
-            $name = $this->attribute($tag, 'name');
-            if ($name === null || !str_starts_with($name, '_s[')) {
+        preg_match_all(
+            '/<(input|select|textarea|button)\b((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>/i',
+            $form,
+            $tags,
+            PREG_SET_ORDER
+        );
+        foreach ($tags as [, $element, $attributeString]) {
+            // Unparsable controls are neither signed nor free, so their submission is rejected.
+            $attributes = $this->parseAttributes($attributeString);
+            $name = $attributes['name'] ?? '';
+            if (!str_starts_with($name, '_s[')) {
                 continue;
             }
             $path = substr($name, 2);
-            if (str_starts_with($tag, '<input') && strtolower((string)$this->attribute($tag, 'type')) === 'hidden') {
-                $fixed[] = rawurlencode('tx_solr' . $path) . '=' . rawurlencode((string)$this->attribute($tag, 'value'));
+            if (strtolower($element) === 'input' && strtolower($attributes['type'] ?? '') === 'hidden') {
+                $fixed[] = [$path, $attributes['value'] ?? ''];
             } else {
                 $free[$path] = $path;
             }
         }
 
-        return $this->tokenService->encode(implode('&', $fixed), array_values($free));
+        $query = [];
+        foreach ($fixed as [$path, $value]) {
+            // A name without `[]` carries one value, so an editable control with
+            // the same name (e.g. a checkbox after its hidden fallback) replaces it.
+            if (isset($free[$path]) && !str_ends_with($path, '[]')) {
+                continue;
+            }
+            $query[] = rawurlencode('tx_solr' . $path) . '=' . rawurlencode($value);
+        }
+
+        return $this->tokenService->encode(implode('&', $query), array_values($free));
     }
 
-    private function attribute(string $tag, string $name): ?string
+    /**
+     * Tokenize attributes left to right like the browser does, so text inside a
+     * quoted value never counts as another attribute.
+     *
+     * @return array<string, string> lowercase names, the first occurrence wins; empty if unparsable
+     */
+    private function parseAttributes(string $attributeString): array
     {
-        if (preg_match('/\s' . $name . '\s*=\s*(["\'])(.*?)\1/si', $tag, $matches) !== 1) {
-            return null;
+        $attributes = [];
+        $offset = 0;
+        $pattern = '/\G[\s\/]*([^\s"\'>\/=]+)(?:\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'=<>`]+)))?/';
+        while (preg_match($pattern, $attributeString, $matches, PREG_UNMATCHED_AS_NULL, $offset) === 1) {
+            $offset += strlen((string)$matches[0]);
+            $attributes[strtolower((string)$matches[1])] ??= html_entity_decode(
+                $matches[2] ?? $matches[3] ?? $matches[4] ?? '',
+                ENT_QUOTES | ENT_HTML5
+            );
         }
-        return html_entity_decode($matches[2], ENT_QUOTES | ENT_HTML5);
+
+        return preg_match('/^[\s\/]*$/', substr($attributeString, $offset)) === 1 ? $attributes : [];
     }
 }

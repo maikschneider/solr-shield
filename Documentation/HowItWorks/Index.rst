@@ -68,7 +68,10 @@ Each form gets its own ``_ss``. It signs the values of the form's hidden
 form, and the names of all other fields, such as ``tx_solr[q]``. A submission
 may fill in those fields freely, but it can neither change a hidden value nor
 add a field the form does not have. A name ending in ``[]`` accepts any
-numeric index.
+numeric index. Hidden values of such a name are pinned to their position, so
+render them before the visible fields of the same name. A hidden field without
+``[]`` that shares its name with a visible field, like the fallback Fluid
+renders before a checkbox, is not pinned: the visible field may replace it.
 
 The ``data-suggest`` URL that EXT:solr's autocomplete reads gets a signed
 ``_ss`` as well, unless it already carries one.
