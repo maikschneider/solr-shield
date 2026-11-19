@@ -121,8 +121,11 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
         // A form posted to a URL that came from a signed link carries the link's
         // `_ss` in the query; the form's own `_ss`, which signs its fields, is in the body.
         $rawSs = $this->extractParam([], $parsedBody, '_ss');
+        $linkSs = '';
         if ($rawSs === '') {
             $rawSs = $this->extractParam($queryParams, null, '_ss');
+        } else {
+            $linkSs = $this->extractParam($queryParams, null, '_ss');
         }
         $hasFormFields = isset($queryParams['_s']) || isset($parsedBody['_s']);
 
@@ -146,6 +149,13 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
             return null;
         }
         unset($queryParams['_ss'], $queryParams['_sr'], $parsedBody['_ss']);
+        if ($linkSs !== '') {
+            $link = $this->tokenService->decode($linkSs);
+            if ($link === null) {
+                return null;
+            }
+            $queryParams = array_merge($queryParams, $link['params']);
+        }
 
         if ($isSuggestRequest) {
             $queryParams = array_replace_recursive($queryParams, $payload['params']);

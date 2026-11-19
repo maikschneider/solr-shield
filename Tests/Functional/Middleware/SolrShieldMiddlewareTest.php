@@ -81,6 +81,27 @@ final class SolrShieldMiddlewareTest extends AbstractMiddlewareTestCase
     }
 
     #[Test]
+    public function formPostedToSignedLinkKeepsTheLinkParameters(): void
+    {
+        $uri = '/search?_ss=' . rawurlencode($this->signedPayload('tx_solr%5Bq%5D=bike'));
+        $body = ['_s' => ['resultsPerPage' => '5'], '_ss' => $this->signedPayload('', ['[resultsPerPage]'])];
+
+        $echoed = $this->echoed($this->request($uri, $body));
+
+        self::assertSame(['tx_solr' => ['q' => 'bike']], $echoed['query']);
+        self::assertSame(['tx_solr' => ['resultsPerPage' => '5']], $echoed['body']);
+    }
+
+    #[Test]
+    public function formPostedToForgedLinkIsRejected(): void
+    {
+        $uri = '/search?_ss=' . rawurlencode($this->payloadWithSignature('tx_solr%5Bq%5D=bike', 'AAAAAAAAAAAAAAAA'));
+        $body = ['_s' => ['resultsPerPage' => '5'], '_ss' => $this->signedPayload('', ['[resultsPerPage]'])];
+
+        $this->assertForbidden($this->request($uri, $body));
+    }
+
+    #[Test]
     public function signedSuggestRequestPasses(): void
     {
         $response = $this->request('/?type=7384&tx_solr%5BqueryString%5D=fo&_ss=' . rawurlencode($this->signedPayload('')));
