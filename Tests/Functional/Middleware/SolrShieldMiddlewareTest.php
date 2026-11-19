@@ -93,6 +93,18 @@ final class SolrShieldMiddlewareTest extends AbstractMiddlewareTestCase
     }
 
     #[Test]
+    public function formPostedToSignedRangeLinkFillsTheLinkRange(): void
+    {
+        $uri = '/search?_ss=' . rawurlencode($this->signedPayload('tx_solr%5Bfilter%5D%5B0%5D=uidRange%3A___FROM___-___TO___'))
+            . '&_sr%5Bfrom%5D=1&_sr%5Bto%5D=5';
+        $body = ['_s' => ['resultsPerPage' => '5'], '_ss' => $this->signedPayload('', ['[resultsPerPage]'])];
+
+        $echoed = $this->echoed($this->request($uri, $body));
+
+        self::assertSame(['tx_solr' => ['filter' => ['uidRange:1-5']]], $echoed['query']);
+    }
+
+    #[Test]
     public function formPostedToForgedLinkIsRejected(): void
     {
         $uri = '/search?_ss=' . rawurlencode($this->payloadWithSignature('tx_solr%5Bq%5D=bike', 'AAAAAAAAAAAAAAAA'));

@@ -148,14 +148,16 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
         if ($payload['params'] === null) {
             return null;
         }
-        unset($queryParams['_ss'], $queryParams['_sr'], $parsedBody['_ss']);
+        $linkParams = [];
         if ($linkSs !== '') {
             $link = $this->tokenService->decode($linkSs);
-            if ($link === null) {
+            $linkParams = $link === null ? null : $this->fillRangePlaceholders($link['params'], $queryParams['_sr'] ?? null);
+            if ($linkParams === null) {
                 return null;
             }
-            $queryParams = array_merge($queryParams, $link['params']);
         }
+        unset($queryParams['_ss'], $queryParams['_sr'], $parsedBody['_ss']);
+        $queryParams = array_merge($queryParams, $linkParams);
 
         if ($isSuggestRequest) {
             $queryParams = array_replace_recursive($queryParams, $payload['params']);
