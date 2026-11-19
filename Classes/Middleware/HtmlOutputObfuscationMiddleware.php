@@ -202,7 +202,10 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
             }
             $path = substr($name, 2);
             if (strtolower($element) === 'input' && strtolower($attributes['type'] ?? '') === 'hidden') {
-                $fixed[] = [$path, $attributes['value'] ?? ''];
+                // The browser does not submit a disabled field, so its value must not be restored.
+                if (!isset($attributes['disabled'])) {
+                    $fixed[] = [$path, $attributes['value'] ?? ''];
+                }
             } else {
                 $free[$path] = $path;
             }
