@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-11-20
+
+### Fixed
+
+- **Version metadata matches the release.** 1.1.0 was tagged with the 1.0.1 version in `ext_emconf.php`, `composer.json` and the documentation, so it never reached the TER. TER users update from 1.0.1 straight to 1.1.1, which contains everything listed under 1.1.0.
+
+## [1.1.0] - 2026-11-20
+
 ### Changed
 
 - **Range facets accept open bounds.** An empty `_sr[from]` or `_sr[to]` leaves that end of the range open (`202612010000-` filters from 2026-12-01 on); anything other than a number or an empty value is still rejected. The patched date range scripts send an empty bound when only one date is set, instead of sending nothing ([#28](https://github.com/maikschneider/solr-shield/issues/28)).
