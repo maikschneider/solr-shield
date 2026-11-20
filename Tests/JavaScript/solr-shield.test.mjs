@@ -10,10 +10,18 @@ const script = readFileSync(new URL('../../Resources/Public/JavaScript/solr-shie
 const load = (baseURI = 'https://example.com/news/page') => {
   const opened = [];
   const fetched = [];
+  const listeners = [];
   class XMLHttpRequest {
     open(method, url, ...rest) {
       opened.push({ method, url: String(url), rest });
     }
+  }
+  class HTMLFormElement {
+    get elements() {
+      return this.fields;
+    }
+
+    submit() {}
   }
   const window = {
     location: new URL('https://example.com/news/page'),
@@ -27,10 +35,14 @@ const load = (baseURI = 'https://example.com/news/page') => {
   };
   const context = vm.createContext({
     window,
-    document: { addEventListener: () => {}, baseURI },
+    document: {
+      addEventListener: (type, listener) => listeners.push({ type, listener }),
+      createElement: () => element(),
+      baseURI,
+    },
     navigator: { webdriver: false },
     XMLHttpRequest,
-    HTMLFormElement: class { submit() {} },
+    HTMLFormElement,
     Element: class {},
     Request,
     URL,
@@ -38,8 +50,39 @@ const load = (baseURI = 'https://example.com/news/page') => {
   });
   vm.runInContext(script, context);
 
-  return { window, xhr: () => new XMLHttpRequest(), opened, fetched };
+  const submit = (form) => listeners.filter(({ type }) => type === 'submit').forEach(({ listener }) => listener({ target: form }));
+
+  return { window, xhr: () => new XMLHttpRequest(), opened, fetched, HTMLFormElement, submit };
 };
+
+// A form field with its attributes; after() records the node inserted next to it.
+// `disabled` stands for being disabled itself or through a fieldset.
+const element = (attributes = {}) => ({
+  name: attributes.name ?? '',
+  value: '',
+  attributes: { ...attributes },
+  hasAttribute(name) {
+    return name in this.attributes;
+  },
+  getAttribute(name) {
+    return this.attributes[name] ?? null;
+  },
+  setAttribute(name, value) {
+    this.attributes[name] = value;
+  },
+  matches(selector) {
+    return selector === ':disabled' && 'disabled' in this.attributes;
+  },
+  after(node) {
+    this.next = node;
+  },
+});
+
+// A form whose fields are associated with it, but none of them is a descendant.
+const formWith = (HTMLFormElement, fields) => Object.assign(new HTMLFormElement(), {
+  fields,
+  querySelector: () => null,
+});
 
 const botParam = (url) => new URL(url).searchParams.get('_solr_bot');
 const payload = (url) => JSON.parse(atob(botParam(url)));
@@ -126,4 +169,52 @@ test('fetch to other origins or unrelated URLs stays untouched', () => {
 
   assert.equal(fetched[0].input, '/api/data');
   assert.equal(fetched[1].input, request);
+});
+
+test('a form gets the payload next to its token, also when the token is linked from outside', () => {
+  const { HTMLFormElement, submit } = load();
+  const token = element({ name: '_ss', form: 'search' });
+
+  submit(formWith(HTMLFormElement, [element({ name: '_s[q]', form: 'search' }), token]));
+
+  assert.equal(token.next.name, '_solr_bot');
+  assert.equal(token.next.getAttribute('form'), 'search');
+  assert.equal(typeof JSON.parse(atob(token.next.value)).elapsed, 'number');
+});
+
+test('a form reuses its payload field and leaves forms without a token alone', () => {
+  const { HTMLFormElement, submit } = load();
+  const bot = element({ name: '_solr_bot', form: 'search' });
+  const unsigned = element({ name: 'q' });
+
+  submit(formWith(HTMLFormElement, [element({ name: '_ss', form: 'search' }), bot]));
+  submit(formWith(HTMLFormElement, [unsigned]));
+
+  assert.notEqual(bot.value, '');
+  assert.equal(unsigned.next, undefined);
+});
+
+test('a form does not fill a disabled payload field, which the browser would not submit', () => {
+  const { HTMLFormElement, submit } = load();
+  const disabled = element({ name: '_solr_bot', form: 'search', disabled: '' });
+  const token = element({ name: '_ss', form: 'search' });
+
+  submit(formWith(HTMLFormElement, [disabled, token]));
+
+  assert.equal(disabled.value, '');
+  assert.equal(token.next.name, '_solr_bot');
+  assert.notEqual(token.next.value, '');
+});
+
+test('a field named elements does not hide the token', () => {
+  const { HTMLFormElement, submit } = load();
+  const shadowing = element({ name: 'elements' });
+  const token = element({ name: '_ss' });
+  const form = formWith(HTMLFormElement, [shadowing, token]);
+  // Like the browser's named property of a form.
+  Object.defineProperty(form, 'elements', { value: shadowing });
+
+  submit(form);
+
+  assert.equal(token.next.name, '_solr_bot');
 });

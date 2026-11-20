@@ -75,6 +75,19 @@ abstract class AbstractMiddlewareTestCase extends FunctionalTestCase
         return $this->get(TokenService::class)->encode($txSolrQuery, $freeFields);
     }
 
+    /**
+     * The `_ss` the HTML middleware injected into a form of the `/form` fixture.
+     */
+    protected function formSs(string $formId): string
+    {
+        $html = (string)$this->request('/form')->getBody();
+        preg_match('#<form id="' . $formId . '" action=(?:(?!</form>).)*name="_ss" value="([^"]+)"#s', $html, $matches);
+        $value = $matches[1] ?? '';
+        self::assertNotSame('', $value, $html);
+
+        return html_entity_decode($value, ENT_QUOTES);
+    }
+
     protected function payloadWithSignature(string $txSolrQuery, string $signature): string
     {
         return base64_encode((string)json_encode(['p' => $txSolrQuery, 's' => $signature]));

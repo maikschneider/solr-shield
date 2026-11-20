@@ -32,6 +32,10 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
 {
     private const RANGE_FACET_SCRIPTS = ['facet_daterange_controller', 'facet_numericrange_controller'];
 
+    private const RAW_TEXT_ELEMENTS = ['textarea', 'script', 'style', 'iframe', 'noembed', 'noframes', 'title', 'xmp'];
+
+    private const VOID_ELEMENTS = ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr'];
+
     public function __construct(
         private TokenService $tokenService,
         private StreamFactoryInterface $streamFactory,
@@ -160,55 +164,213 @@ final readonly class HtmlOutputObfuscationMiddleware implements MiddlewareInterf
     }
 
     /**
-     * Inject a hidden `_ss` field into every form that carries `_s[` fields.
+     * Inject a hidden `_ss` field into every form that owns `_s[` fields,
+     * including fields linked to it through the `form` attribute.
      * Its payload signs the values of the form's hidden `_s[…]` fields and the
      * names of the fields the visitor fills in, so a submission can neither
      * change a hidden value nor add a field the form does not have.
      */
     private function injectSsTokenIntoForms(string $html): string
     {
-        $result = preg_replace_callback(
-            '/<form\b[^>]*>.*?<\/form>/si',
-            function (array $matches): string {
-                $form = $matches[0];
-                if (!str_contains($form, 'name="_s[') && !str_contains($form, "name='_s[")) {
-                    return $form;
-                }
-                $hiddenField = '<input type="hidden" name="_ss" value="' . htmlspecialchars($this->signForm($form), ENT_QUOTES) . '">';
-                return substr_replace($form, $hiddenField, (int)strripos($form, '</form>'), 0);
-            },
-            $html
-        );
+        [$forms, $controls, $formIndexById] = $this->findFormsAndControls($html);
 
-        return $result ?? $html;
+        // Like the browser, a control with a `form` attribute belongs to the
+        // form with that id, or to no form if there is none, wherever it sits.
+        $controlsByForm = [];
+        $firstControlByForm = [];
+        foreach ($controls as [$parentForm, $tagName, $attributes, $offset]) {
+            $owner = isset($attributes['form']) ? $formIndexById[$attributes['form']] ?? null : $parentForm;
+            if ($owner !== null && $forms[$owner][0] !== null) {
+                $controlsByForm[$owner][] = [$tagName, $attributes];
+                $firstControlByForm[$owner] ??= [$offset, $attributes['form'] ?? null];
+            }
+        }
+
+        $hiddenFields = [];
+        foreach ($controlsByForm as $index => $formControls) {
+            $hiddenField = '<input type="hidden" name="_ss" value="' . htmlspecialchars($this->signForm($formControls), ENT_QUOTES) . '"';
+            [$endOffset, $endDisabled] = $forms[$index];
+            if ($endDisabled) {
+                // The end tag sits in a disabled fieldset, which would disable the
+                // token. In front of the first control, with its `form` attribute,
+                // it is enabled and belongs to the same form.
+                [$offset, $formAttribute] = $firstControlByForm[$index];
+                $hiddenFields[$offset] = $hiddenField . ($formAttribute !== null ? ' form="' . htmlspecialchars($formAttribute, ENT_QUOTES) . '"' : '') . '>';
+            } else {
+                $hiddenFields[(int)$endOffset] = $hiddenField . '>';
+            }
+        }
+
+        // Insert from the end backwards, so the earlier offsets stay valid.
+        krsort($hiddenFields);
+        foreach ($hiddenFields as $offset => $hiddenField) {
+            $html = substr_replace($html, $hiddenField, $offset, 0);
+        }
+
+        return $html;
     }
 
-    private function signForm(string $form): string
+    /**
+     * All forms and enabled `_s[…]` controls of the document, in document order.
+     *
+     * @return array{list<array{?int, bool}>, list<array{?int, string, array<string, string>, int}>, array<string, ?int>}
+     *     forms with the offset of their end tag (null if unclosed) and whether
+     *     that end tag sits in a disabled fieldset, controls with their
+     *     enclosing form, lowercase tag name, attributes and offset, and the
+     *     form each id names (null if the first element with it is no form)
+     */
+    private function findFormsAndControls(string $html): array
+    {
+        // Every tag is consumed whole, so tag-like text inside an attribute
+        // value, a comment, a textarea or another raw-text element (script,
+        // style, iframe, …) never counts as a tag.
+        // A tag name ends at whitespace, `/` or `>`, so `<textarea-wrapper>` is no textarea.
+        // Possessive loops keep large inline content within PCRE's backtrack limit.
+        // Tags are matched one at a time, so a tag-heavy page needs little memory.
+        $attributePattern = '((?:[^>"\']++|"[^"]*+"|\'[^\']*+\')*+)';
+        $tagPattern = '/<!--[^-]*+(?:-(?!->)[^-]*+)*+-->'
+            . '|(?|<(' . implode('|', self::RAW_TEXT_ELEMENTS) . ')(?=[\t\n\f\r \/>])' . $attributePattern . '>[^<]*+(?:<(?!\/\1\s*>)[^<]*+)*+<\/\1\s*>'
+            . '|<([a-z][^\t\n\f\r \/>]*+)' . $attributePattern . '>)'
+            . '|<\/([a-z][^\t\n\f\r \/>]*+)[^>]*+>/is';
+        $forms = [];
+        $controls = [];
+        // Like the browser, a `form` attribute names the first element with
+        // that id, which owns the control only if it is a form.
+        $formIndexById = [];
+        $openForm = null;
+        // The content of a template is no part of the document.
+        $templateDepth = 0;
+        // The HTML spec leaves a control inside a datalist out of the submission.
+        $datalistDepth = 0;
+        // Per open fieldset: whether it is disabled, whether its first legend
+        // child, which it does not disable, is not yet seen (0), open (1) or
+        // closed (2), and the elements open inside it until that legend is seen.
+        $fieldsets = [];
+        $offset = 0;
+        while (($found = preg_match($tagPattern, $html, $tag, PREG_OFFSET_CAPTURE | PREG_UNMATCHED_AS_NULL, $offset)) === 1) {
+            $offset = $tag[0][1] + strlen((string)$tag[0][0]);
+            // Start tags by name, end tags as `/name`.
+            $tagName = strtolower($tag[1][0] ?? (isset($tag[3][0]) ? '/' . $tag[3][0] : ''));
+            // Like the browser, ignore a form inside a form.
+            $isIgnoredForm = $tagName === 'form' && $openForm !== null;
+            // A template's content is no part of the document, the template itself is.
+            if ($templateDepth === 0 && isset($tag[2][0]) && !$isIgnoredForm && stripos($tag[2][0], 'id') !== false) {
+                $id = $this->parseAttributes($tag[2][0])['id'] ?? '';
+                if ($id !== '' && !array_key_exists($id, $formIndexById)) {
+                    $formIndexById[$id] = $tagName === 'form' ? count($forms) : null;
+                }
+            }
+            if ($tagName === 'template' || $tagName === '/template') {
+                $templateDepth = max(0, $templateDepth + ($tagName === 'template' ? 1 : -1));
+                continue;
+            }
+            if ($templateDepth > 0) {
+                continue;
+            }
+            if ($tagName === '/fieldset') {
+                array_pop($fieldsets);
+            }
+            $innermostFieldset = array_key_last($fieldsets);
+            if ($innermostFieldset !== null && $fieldsets[$innermostFieldset][1] === 0) {
+                $fieldsets[$innermostFieldset] = $this->trackFirstLegendChild($fieldsets[$innermostFieldset], $tagName);
+            }
+            switch ($tagName) {
+                case 'form':
+                    if (!$isIgnoredForm) {
+                        $forms[] = [null, false];
+                        $openForm = array_key_last($forms);
+                    }
+                    break;
+                case '/form':
+                    if ($openForm !== null) {
+                        $forms[$openForm] = [$tag[0][1], $this->isDisabledByFieldset($fieldsets)];
+                        $openForm = null;
+                    }
+                    break;
+                case 'fieldset':
+                    $fieldsets[] = [isset($this->parseAttributes((string)$tag[2][0])['disabled']), 0, []];
+                    break;
+                case 'datalist':
+                case '/datalist':
+                    $datalistDepth = max(0, $datalistDepth + ($tagName === 'datalist' ? 1 : -1));
+                    break;
+                case '/legend':
+                    if ($innermostFieldset !== null && $fieldsets[$innermostFieldset][1] === 1) {
+                        $fieldsets[$innermostFieldset][1] = 2;
+                    }
+                    break;
+                case 'input':
+                case 'select':
+                case 'button':
+                case 'textarea':
+                    // Unparsable controls are neither signed nor free, so their submission is rejected.
+                    $attributes = $this->parseAttributes((string)$tag[2][0]);
+                    // The browser does not submit a disabled field.
+                    if (str_starts_with($attributes['name'] ?? '', '_s[') && !isset($attributes['disabled']) && $datalistDepth === 0 && !$this->isDisabledByFieldset($fieldsets)) {
+                        $controls[] = [$openForm, $tagName, $attributes, $tag[0][1]];
+                    }
+            }
+        }
+        if ($found === false) {
+            throw new \RuntimeException('Could not find the forms to sign: ' . preg_last_error_msg(), 1795110108);
+        }
+
+        return [$forms, $controls, $formIndexById];
+    }
+
+    /**
+     * Only a legend that is a direct child of the fieldset is its first legend.
+     * Markup that does not nest strictly gives up on the legend, so its
+     * controls stay disabled rather than being signed although the browser
+     * omits them.
+     *
+     * @param array{bool, int, list<string>} $fieldset
+     * @return array{bool, int, list<string>}
+     */
+    private function trackFirstLegendChild(array $fieldset, string $tagName): array
+    {
+        [$disabled, , $openElements] = $fieldset;
+        if ($tagName === 'legend' && $openElements === []) {
+            return [$disabled, 1, []];
+        }
+        if (str_starts_with($tagName, '/')) {
+            $name = substr($tagName, 1);
+            if (end($openElements) === $name) {
+                array_pop($openElements);
+            } elseif (in_array($name, $openElements, true)) {
+                return [$disabled, 2, []];
+            }
+        } elseif ($tagName !== '' && !in_array($tagName, [...self::RAW_TEXT_ELEMENTS, ...self::VOID_ELEMENTS], true)) {
+            $openElements[] = $tagName;
+        }
+
+        return [$disabled, 0, $openElements];
+    }
+
+    /**
+     * @param list<array{bool, int, list<string>}> $fieldsets
+     */
+    private function isDisabledByFieldset(array $fieldsets): bool
+    {
+        foreach ($fieldsets as [$disabled, $legend]) {
+            if ($disabled && $legend !== 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<array{string, array<string, string>}> $controls lowercase tag name and attributes
+     */
+    private function signForm(array $controls): string
     {
         $fixed = [];
         $free = [];
-        // Every tag is consumed whole, so tag-like text inside an attribute
-        // value, a comment, a script, a style or a textarea never counts as a control.
-        // A tag name ends at whitespace, `/` or `>`, so `<textarea-wrapper>` is no textarea.
-        preg_match_all(
-            '/<!--.*?-->|<(script|style)(?=[\t\n\f\r \/>]).*?<\/\1\s*>|(?|<(textarea)(?=[\t\n\f\r \/>])((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>.*?<\/textarea\s*>|<(input|select|button)(?=[\t\n\f\r \/>])((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>)|<[a-z](?:[^>"\']|"[^"]*"|\'[^\']*\')*>/is',
-            $form,
-            $tags,
-            PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL
-        );
-        foreach ($tags as $tag) {
-            if ($tag[2] === null) {
-                continue;
-            }
-            // Unparsable controls are neither signed nor free, so their submission is rejected.
-            $attributes = $this->parseAttributes((string)$tag[3]);
-            $name = $attributes['name'] ?? '';
-            // The browser does not submit a disabled field.
-            if (!str_starts_with($name, '_s[') || isset($attributes['disabled'])) {
-                continue;
-            }
-            $path = substr($name, 2);
-            if (strtolower($tag[2]) === 'input' && strtolower($attributes['type'] ?? '') === 'hidden') {
+        foreach ($controls as [$tagName, $attributes]) {
+            $path = substr($attributes['name'], 2);
+            if ($tagName === 'input' && strtolower($attributes['type'] ?? '') === 'hidden') {
                 $fixed[] = [$path, $attributes['value'] ?? ''];
             } else {
                 $free[$path] = $path;
