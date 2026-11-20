@@ -119,7 +119,10 @@ payload, and its signature breaks as soon as the payload changes. Leave
 ``_ss`` as it is and send the values as ``_sr[from]`` and ``_sr[to]``, as the
 patched range facet scripts do. The middleware fills them into the
 ``___FROM___`` and ``___TO___`` placeholders of the signed parameters and
-accepts numbers only:
+accepts numbers and empty values only. An empty value leaves that end of the
+range open, as EXT:solr's date range decoder turns it into ``*``
+(``_sr[to]=`` yields ``202612010000-``). EXT:solr's numeric range decoder
+needs both bounds:
 
 ..  code-block:: javascript
 

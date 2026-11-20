@@ -192,8 +192,9 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
      * Range facets sign a URL template, so the browser cannot fill in the
      * range without breaking the signature. It sends the range as
      * `_sr[from]` and `_sr[to]` instead, which replace the `___FROM___` and
-     * `___TO___` placeholders of the signed parameters. Only numbers are
-     * accepted, so nothing but the range bounds can be changed.
+     * `___TO___` placeholders of the signed parameters. Only numbers and the
+     * empty string of an open bound are accepted, so nothing but the range
+     * bounds can be changed.
      *
      * @param array<array-key, mixed> $params
      * @return array<array-key, mixed>|null
@@ -208,7 +209,7 @@ final readonly class SolrShieldMiddleware implements MiddlewareInterface
         }
         $replacements = [];
         foreach ($range as $bound => $value) {
-            if (!is_string($value) || preg_match('/^-?\d+(?:\.\d+)?$/', $value) !== 1) {
+            if (!is_string($value) || preg_match('/^(?:-?\d+(?:\.\d+)?)?$/D', $value) !== 1) {
                 return null;
             }
             $replacements['___' . strtoupper((string)$bound) . '___'] = $value;
