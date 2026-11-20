@@ -116,14 +116,15 @@ var DateRangeFacetController = class {
    * @returns {boolean}
    */
   validateDate() {
-    if (this.minDatePicker.value < this.minDatePicker.min || this.minDatePicker.value > this.minDatePicker.max) {
+    // Solr Shield: an empty input is an open bound, not an invalid date
+    if (this.minDatePicker.value && (this.minDatePicker.value < this.minDatePicker.min || this.minDatePicker.value > this.minDatePicker.max)) {
       const validationText = this.startValidationText
         .replace('###MIN###', this.minDatePicker.min)
         .replace('###MAX###', this.minDatePicker.max)
       alert(validationText)
       return false
     }
-    if (this.maxDatePicker.value < this.maxDatePicker.min || this.maxDatePicker.value > this.maxDatePicker.max) {
+    if (this.maxDatePicker.value && (this.maxDatePicker.value < this.maxDatePicker.min || this.maxDatePicker.value > this.maxDatePicker.max)) {
       const validationText = this.endValidationText
         .replace('###MIN###', this.maxDatePicker.min)
         .replace('###MAX###', this.maxDatePicker.max)
@@ -137,10 +138,10 @@ var DateRangeFacetController = class {
    * Build URL and call it
    */
   filter() {
-    if (this.minDatePicker.value && this.maxDatePicker.value) {
-      const minDate = this.minDatePicker.value.replaceAll("-", "") + '0000';
-      const maxDate = this.maxDatePicker.value.replaceAll("-", "") + '2359';
-      // Solr Shield
+    // Solr Shield: a single date filters an open range, sent as an empty bound
+    if (this.minDatePicker.value || this.maxDatePicker.value) {
+      const minDate = this.minDatePicker.value ? this.minDatePicker.value.replaceAll("-", "") + '0000' : '';
+      const maxDate = this.maxDatePicker.value ? this.maxDatePicker.value.replaceAll("-", "") + '2359' : '';
       const url = solrShieldFillUrl(this.urlTemplate, { ___FROM___: minDate, ___TO___: maxDate })
       this.validateDate() ? solrShieldNavigate(url) : null
     } else {

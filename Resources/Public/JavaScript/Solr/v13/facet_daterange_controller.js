@@ -42,13 +42,13 @@ function DateRangeFacetController() {
     this.solrRequest = function(facetName) {
         startDate = jQuery('#start_date_'+facetName);
         endDate = jQuery('#end_date_'+facetName);
-        if (startDate.val() !== '' &&  endDate.val() !== '' ) {
+        // Solr Shield: a single date filters an open range, sent as an empty bound
+        if (startDate.val() !== '' || endDate.val() !== '') {
             url = jQuery('#' + facetName + '_url').val();
-            start_date = _this.convertToDate(startDate.datepicker('getDate'));
-            end_date = _this.convertToDate(endDate.datepicker('getDate'));
+            start_date = startDate.val() !== '' ? _this.convertToDate(startDate.datepicker('getDate')) + '0000' : '';
+            end_date = endDate.val() !== '' ? _this.convertToDate(endDate.datepicker('getDate')) + '0000' : '';
 
-            // Solr Shield
-            url = solrShieldFillUrl(url, { ___FROM___: start_date + '0000', ___TO___: end_date + '0000' });
+            url = solrShieldFillUrl(url, { ___FROM___: start_date, ___TO___: end_date });
             solrShieldNavigate(url);
         }
     };

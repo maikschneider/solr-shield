@@ -188,11 +188,24 @@ final class PayloadIntegrityTest extends AbstractMiddlewareTestCase
     }
 
     #[Test]
+    public function emptyRangeBoundLeavesTheRangeOpen(): void
+    {
+        $ss = rawurlencode($this->signedPayload('tx_solr%5Bfilter%5D%5B0%5D=created%3A___FROM___-___TO___'));
+
+        self::assertSame(
+            ['tx_solr' => ['filter' => ['created:202612010000-']]],
+            $this->echoed($this->request('/search?_ss=' . $ss . '&_sr%5Bfrom%5D=202612010000&_sr%5Bto%5D='))['query']
+        );
+    }
+
+    #[Test]
     public function rangeBoundsAcceptOnlyNumbers(): void
     {
         $ss = rawurlencode($this->signedPayload('tx_solr%5Bfilter%5D%5B0%5D=uidRange%3A___FROM___-___TO___'));
 
         $this->assertForbidden($this->request('/search?_ss=' . $ss . '&_sr%5Bfrom%5D=5&_sr%5Bto%5D=10%20OR%20type%3Anews'));
+        $this->assertForbidden($this->request('/search?_ss=' . $ss . '&_sr%5Bfrom%5D=5&_sr%5Bto%5D=%20'));
+        $this->assertForbidden($this->request('/search?_ss=' . $ss . '&_sr%5Bfrom%5D=5&_sr%5Bto%5D=%2A'));
         $this->assertForbidden($this->request('/search?_ss=' . $ss . '&_sr%5Bfrom%5D=5&_sr%5Bq%5D=10'));
         $this->assertForbidden($this->request('/search?_ss=' . $ss . '&_sr=5'));
     }

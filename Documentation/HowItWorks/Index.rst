@@ -101,7 +101,12 @@ EXT:solr 13 and one for EXT:solr 14. The patched scripts leave the signed
 the URL through a link click, so ``solr-shield.js`` adds ``_solr_bot`` like
 for any other link. The middleware ``maikschneider/solr-shield`` puts the two
 values into the placeholders after checking the signature; it accepts numbers
-only. It does not matter how the stock scripts are included, for example
+and empty values only. An empty value is an open bound: when a visitor fills
+in only one date of a date range facet, the patched scripts send the other
+bound empty, and ``202612010000-`` filters everything from 2026-12-01 on.
+EXT:solr's own date range scripts send nothing until both dates are set.
+Numeric range sliders always send both bounds. It does not matter how the
+stock scripts are included, for example
 through EXT:solr's example site sets or your own TypoScript.
 
 ..  _how-it-works-middleware:
@@ -127,7 +132,7 @@ The middleware ``maikschneider/solr-shield`` runs after
     *   - Suggest request (``type=7384``) with a valid ``_ss``
         - Payload merged with the typed ``tx_solr[queryString]``
     *   - Valid ``_ss`` with ``_sr[from]`` and ``_sr[to]`` (range facets)
-        - Numeric bounds filled into the payload's ``___FROM___`` and
+        - Numeric or empty bounds filled into the payload's ``___FROM___`` and
           ``___TO___`` placeholders, anything else rejected
     *   - Raw ``tx_solr`` parameters, with or without ``_ss``
         - Rejected (see :confval:`setting-uriObfuscation-rejectAction`);

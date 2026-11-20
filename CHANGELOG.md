@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Range facets accept open bounds.** An empty `_sr[from]` or `_sr[to]` leaves that end of the range open (`202612010000-` filters from 2026-12-01 on); anything other than a number or an empty value is still rejected. The patched date range scripts send an empty bound when only one date is set, instead of sending nothing ([#28](https://github.com/maikschneider/solr-shield/issues/28)).
 - **Bot detection covers autocomplete requests.** Suggest requests (`type=7384`) without a valid `_solr_bot` are rejected; they skip the `minFormTimeout` check. `solr-shield.js` adds the payload to same-origin `XMLHttpRequest` and `fetch()` calls for suggest URLs and for URLs that carry `_ss`, so EXT:solr's suggest controllers and AJAX-loaded result URLs work without changes. Rejected suggest requests always get an empty `403`, also with `rejectAction: redirect` ([#23](https://github.com/maikschneider/solr-shield/issues/23)).
 
 ### Fixed
@@ -17,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- **`_ss` signatures cover the payload.** The signature used to be the same constant for every link, so any visitor could copy it from a search page and sign arbitrary filter combinations. It is now an HMAC over the signed `tx_solr` parameters. Each search form gets its own `_ss` that pins its hidden values and lists its free fields, including fields outside the form that are linked to it through the `form` attribute ([#25](https://github.com/maikschneider/solr-shield/issues/25)); raw `tx_solr` parameters next to a valid `_ss` are rejected, except `tx_solr[queryString]` on autocomplete requests. Range facets send their bounds as `_sr[from]` and `_sr[to]` next to the signed URL template; only numbers are accepted ([#6](https://github.com/maikschneider/solr-shield/issues/6)).
+- **`_ss` signatures cover the payload.** The signature used to be the same constant for every link, so any visitor could copy it from a search page and sign arbitrary filter combinations. It is now an HMAC over the signed `tx_solr` parameters. Each search form gets its own `_ss` that pins its hidden values and lists its free fields, including fields outside the form that are linked to it through the `form` attribute ([#25](https://github.com/maikschneider/solr-shield/issues/25)); raw `tx_solr` parameters next to a valid `_ss` are rejected, except `tx_solr[queryString]` on autocomplete requests. Range facets send their bounds as `_sr[from]` and `_sr[to]` next to the signed URL template; only numbers and empty (open) bounds are accepted ([#6](https://github.com/maikschneider/solr-shield/issues/6)).
   **Breaking:** links signed by 1.0.1 are rejected (`403`, or the redirect set by `rejectAction`). This includes links that crawlers and search engines indexed before the update. There is no migration window.
 
 ## [1.0.1] - 2026-10-23
